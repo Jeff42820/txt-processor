@@ -1,0 +1,102 @@
+
+
+
+<!-- 
+          ================================================
+            signal from HTML element to a specific class
+          ================================================
+
+-->
+HTML
+    <button id="id_modal_no"  type="reset"  value="no" onclick="DmcModal.do_cancel(this);">No</button>
+
+JS-CLASS
+
+    <script>
+    class DmcModal {
+
+        static do_cancel( eltFromEvent ) {
+        }
+
+    }
+    </script>
+
+
+
+<!-- 
+          ================================================
+            signal from HTML element to the application
+          ================================================
+
+-->
+HTML
+    <li id="id_mnu_table"><a  signal="click››evtsig_calcTable">Calc table</a>
+    </li>
+
+JS-CLASS
+
+    <script>
+    class ApplicationTest extends Application {
+
+        evtsig_calcTable( event, elt, details )  {
+        }
+    
+    }
+    </script>
+
+
+<!-- 
+          ================================================
+            signal from WIDGET element to the widget class
+          ================================================
+
+-->
+HTML
+    <dialog id="id_dlg_login" mwgtclass="WgtLogin" class="dmc_modal fade-in">
+        <img src="icons/eye.svg" msignal="click››evtsig_do_showpsw"  />
+    </dialog>
+
+
+JS-CLASS
+
+    <script>
+    class WgtLogin extends DmcBase {
+
+        evtsig_do_showpsw( event, elt, details )  {
+        }
+    
+    }
+    </script>
+
+
+/*
+
+    List of signal type :
+
+
+    1) js connection in onload functions
+    ____________________________________
+
+    static DmcFramework::connect_statusmsg( parent ) {
+        let elts = parent.querySelectorAll('[statusmsg]');
+        for (let i=0; i < elts.length; i++) {
+            let elt = elts[i];
+            if (!elt.onmouseover) {
+                // elt.onmouseover = function () {  DmcFramework._this.setStatus( elt.getAttribute('statusmsg') );  }
+                elt.onmouseover = DmcFramework._setStatus;    
+            }
+        }
+    }
+
+
+    2) js connection in module constructor
+    ______________________________________
+    DmcFramework::constructor() {
+        DmcFramework._this = this;
+        let elt_fw_plus = document.getElementById("id_fw_plus");
+        elt_fw_plus.onclick = function(event) {   return false;   };
+    }
+
+
+*/
+

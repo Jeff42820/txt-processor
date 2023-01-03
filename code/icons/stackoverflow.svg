@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 64 64"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="stackoverflow-ori.svg"
+   width="32"
+   height="32"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs12" />
+  <sodipodi:namedview
+     id="namedview10"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false" />
+  <style
+     id="style2">.st0{fill:#bcbbbb}.st1{fill:#f48023}</style>
+  <path
+     class="st0"
+     d="M 47.511845,54.780108 V 39.777796 h 4.979217 V 59.759322 H 7.5487957 V 39.777796 h 4.9792153 v 15.002312 z"
+     id="path4"
+     style="stroke-width:0.646649" />
+  <path
+     class="st1"
+     d="m 18.024548,38.355165 24.443415,5.108544 1.034642,-4.91455 -24.443414,-5.108547 z M 21.257803,26.715441 43.890599,37.255857 45.959883,32.729298 23.327089,22.124216 Z M 27.53032,15.593041 46.735863,31.565327 49.904455,27.750084 30.698912,11.777796 Z M 39.946026,3.7593217 35.936788,6.7339169 50.809765,26.780108 54.819008,23.805511 Z M 17.507227,49.736227 H 42.467963 V 44.757011 H 17.507227 Z"
+     id="path6"
+     style="stroke-width:0.646649" />
+</svg>
