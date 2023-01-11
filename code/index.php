@@ -42,7 +42,7 @@ include './src/div-menu.mod.php';               // division module for a std men
 include './src/div-containers.mod.php';         // division module for some containers
 include './src/div-contextmenu.mod.php';        // division module for context menus
 include './src/div-dropfile.mod.php';           // division module for a div to drag-drop files
-// include './src/div-icons-1.mod.php';             // division module : some embeded svg icons
+include './src/div-icons-1.mod.php';            // division module : some embeded svg icons
 // include './src/div-toolbar.mod.php';             //
 include './src/div-accounting.mod.php';         // 
 
@@ -129,12 +129,35 @@ table.txt_file_dest tr td  {
 }
 
 
-textarea.cmdslist {
+textarea.program_edit {
     min-width: 22em;
     min-height: 5em;
     background-color: #ecf;
+    max-width: calc(100% - 6px);  
 }
 
+input[type="text"].program_edit  {
+    max-width: 10em;
+}
+
+button[type="button"].program_edit {
+    background-color: var(--main_color);
+    padding:  0.5em;
+    border-radius: 1em;
+}
+
+button[type="button"].program_edit  i{
+    color: white;
+}
+
+.appli_std_color {
+    color: white;
+    background-color: var(--main_color);  
+}
+
+a.help_link {
+    text-decoration-style: dotted;
+}
 
 EOLONGTEXT );  // mod_css_index_php   
 CModules::include_end(__FILE__);
@@ -161,9 +184,11 @@ class ApplicationTest extends Application {
     name='txtcompute•';
     defaultLSCookies = {
         'file_src.value' :      'Please paste some text here',
+        'lst_textarea.value' :  '',
         'elt_file_src.height' : '300px',
         'test1' :               'default value',
         'columnsOrder' :        '1;2;3;4;5;6;7;8;9;10',
+        'reportCellIfNext' :    '1',
         'CRinQuotesChar' :      '¶',
         'internationalParams' : '{"decimalSeparator":",","columnSeparator":";","currencySymbol":"€","dateFormat":"dd/mm/yyyy"}'
     };
@@ -185,7 +210,8 @@ class ApplicationTest extends Application {
         let json =  await this.post_cmd( 'post_tic', { user:lastuser, 
                     watermark:watermark, wm_time:wm_time } );
         if (json && json.return) {
-            // app.log('ApplicationTest::timer post_tic return=' + json.return );
+            if (json._duration > 200)
+                app.log('ApplicationTest::timer post_tic returns=' + json.return + ', duration='+json._duration );
         }
 
         if (json && json.news != '')
@@ -222,9 +248,16 @@ class ApplicationTest extends Application {
         if (h != null) this.elt_file_src.style.height = h;
 
         h = this._getLSCookie('file_src.value');
-        if (h != null) {
-            this.elt_file_src.value = h;
-        } 
+        if (h != null) this.elt_file_src.value = h;
+        
+        h = this._getLSCookie('elt_cmdlst_textarea.width');
+        if (h != null) this.elt_cmdlst_textarea.style.width = h;
+
+        h = this._getLSCookie('elt_cmdlst_textarea.height');
+        if (h != null) this.elt_cmdlst_textarea.style.height = h;
+
+        h  = this._getLSCookie('lst_textarea.value');
+        if (h != null) this.elt_cmdlst_textarea.value = h;
 
         DmcFramework.connect_statusmsg( document.body );
         Application.connect_signals();
@@ -244,7 +277,7 @@ class ApplicationTest extends Application {
 
 
     run_cmd(cmd){
-        // id_cmdlst_textarea   cmdslist
+        // id_cmdlst_textarea   program_edit
         if (cmd.startsWith('evtsig_'))
             cmd = cmd.substring(7);
         if (this.elt_cmdlst_textarea.value) this.elt_cmdlst_textarea.value += "\\n";
@@ -255,25 +288,28 @@ class ApplicationTest extends Application {
     // ===========================
 
 
-    evtsig_prog_save(event) {
+    async evtsig_prog_save(event) {
         let newv = document.getElementById( 'id_cmdlst_title' ).value;
         let text  = document.getElementById( 'id_cmdlst_textarea' ).value;
-        // app.log('evtsig_prog_save ['+title+']');
 
-                //   <fieldset id="id_lsbx_processes"  mwgtclass="WgtListbox">
         let elt_list = document.getElementById( 'id_lsbx_processes' );    
         let list = WgtListbox.getLines ( elt_list );
         let listdata = WgtListbox.get_wgt_listdata( elt_list );
 
         if (list.includes( newv )) {
-            app.error('['+newv+'] already exists, please choose another name, or delete the original.');
-            return;
-        } 
+            // app.error('['+newv+'] already exists, do you want to replace it ?');
+            let v = await DmcModal.showAsync( "id_dlg_yes_no", '['+newv+'] already exists, do you want to replace it ?' );
+            if (v.result != 'SUBMIT') return;
+            listdata[newv] = { textarea: text };            
+        } else {
+            list.push(newv);
+            listdata[newv] = { textarea: text };            
+        }
 
-        list.push(newv);
-        listdata[newv] = { textarea: text };
         WgtListbox.setLines (elt_list, list, listdata);        
     }
+
+
 
     evtsig_prog_help() {
         let method = `
@@ -359,10 +395,24 @@ Voici la liste des champs reconnus :
         app.log('event_file_src_onpaste len=' + pasteTxt.length );        
     }
 
+    // event_file_src_onmouseup   id_cmdlst_textarea  event_cmdlst_textarea_onmouseup
+    event_cmdlst_textarea_onmouseup(event) {
+        let elt_cmdlst_textarea = event.target;
+        let h = elt_cmdlst_textarea.style.height;  if (h == '') h = elt_cmdlst_textarea.clientHeight+'px'; 
+        let w = elt_cmdlst_textarea.style.width;   if (w == '') w = elt_cmdlst_textarea.clientWidth+'px'; 
+        this._setLSCookie('elt_cmdlst_textarea.height', h); 
+        this._setLSCookie('elt_cmdlst_textarea.width',  w); 
+    }
+
     event_file_src_onmouseup(event) {
         let elt_file_src = event.target;
         let h = elt_file_src.style.height;   if (h == '') h = elt_file_src.clientHeight+'px'; 
         this._setLSCookie('elt_file_src.height', h); 
+    }
+
+    event_cmdlst_textarea_oninput( event ) {
+        let elt_lst_textarea = event.target;
+        this._setLSCookie('lst_textarea.value', elt_lst_textarea.value);        
     }
 
     event_file_src_oninput(event){
@@ -406,24 +456,25 @@ Voici la liste des champs reconnus :
     }
 
 
-    msig_lsbx_processes_dblclick( signal ) {         // a msignal
+    msig_lsbx_processes_dblclick( signal ) {         // a msignal 
+        this.do_lsbx_processes_editLine( signal.value );
+    }
 
-        let elt_list = document.getElementById( 'id_lsbx_processes' );    
-        let listdata = WgtListbox.get_wgt_listdata( elt_list );
+
+
+    do_lsbx_processes_editLine(progName) {
+        app.log('do_lsbx_processes_editLine');
+        let fieldset = document.getElementById( 'id_lsbx_processes' );    
+        let listdata = WgtListbox.get_wgt_listdata( fieldset );
         let txt = '';
-
-        if (signal.value in listdata) {
-            txt = listdata[signal.value];
-        } 
-
-        // app.log( 'msig_lsbx_processes_dblclick = ' + signal.value );
-
+        if (progName in listdata) 
+            txt = listdata[progName];
         let elt_title = document.getElementById( 'id_cmdlst_title' );
         let elt_text  = document.getElementById( 'id_cmdlst_textarea' );
-
-        elt_title.value = signal.value;
+        elt_title.value = progName;
         elt_text.value = txt.textarea;
     }
+
 
 
     msig_lsbx_processes_cntxtmnu( signal ) {      // a msignal 
@@ -431,6 +482,24 @@ Voici la liste des champs reconnus :
         DmcContextmenu.showContext( signal, { line: signal.elt } );
         event.preventDefault();
         return false;
+    }
+
+
+    slot_event_login( event, elt, details ) {  
+        let icon_user =  app.icon('icons/svg', 'user.svg');
+        let link = document.getElementById("id_a_login");
+        if (details.check)
+            link.innerHTML = icon_user +   escapeHtml( details.user );
+        else
+            link.innerHTML = icon_user +   escapeHtml( 'login' );
+    }
+
+    slot_event_logout( event, elt, details ) {  
+        let link = document.getElementById("id_a_login");
+        let icon_user =  app.icon('icons/svg', 'user.svg');
+        link.innerHTML = icon_user + 'Login';
+
+        // app.error('logout !');
     }
 
     slot_fill_contextmenu( event, elt, details ) {          // a Application.signal
@@ -449,9 +518,10 @@ Voici la liste des champs reconnus :
 
         let html = '<ul id="id_mnu_context" class="dmc_contextmenu rounded_ctxmenu" '+
                 'style="flex-direction:column;">' +
-                '<li id="id_mnu_1" class="ul_ctxmenu_title"><p>'+ escapeHtml(details.value) +'</p></li>' +
-                '<li id="id_mnu_2"><a signal="click››evtsig_ctx_removeLine">remove line</a></li>' +
-                '<li id="id_mnu_2"><a signal="click››evtsig_ctx_run">run</a></li>' +
+                '<li class="ul_ctxmenu_title"><p>'+ escapeHtml(details.value) +'</p></li>' +
+                '<li><a signal="click››evtsig_ctx_run">run</a></li>' +
+                '<li><a signal="click››evtsig_ctx_deleteLine">delete</a></li>' +
+                '<li><a signal="click››evtsig_ctx_editLine">edit</a></li>' +
                '</ul>';
 
         details.sender.fillHTML( html );
@@ -460,21 +530,55 @@ Voici la liste des champs reconnus :
         return true;
     }
 
-    evtsig_ctx_run(event, elt, details) {
-        let elt_list = document.getElementById( 'id_lsbx_processes' );
+
+    evtsig_ctx_editLine(event) {
         let mnu_details = DmcContextmenu.getDetails();
-        let line = mnu_details.line.innerText;
+        let progName = mnu_details.line.innerText;
+        this.do_lsbx_processes_editLine(progName);
         DmcContextmenu.hide();
-        app.log( 'evtsig_ctx_run = '+line );
     }
 
-    evtsig_ctx_removeLine(event, elt, details) {
+
+    evtsig_ctx_run(event, elt, details) {   // evtsig_prog_run  evtsig_ctx_run
+
+        let elt_list_fieldset = document.getElementById( 'id_lsbx_processes' );  
+        let mnu_details = DmcContextmenu.getDetails();
+        let progName = mnu_details.line.innerText;
+
+        let listdata = WgtListbox.get_wgt_listdata( elt_list_fieldset );
+        let program_src = '';
+        if (progName in listdata) {  program_src = listdata[progName].textarea;  } 
+        DmcContextmenu.hide();
+
+        let acc = new DmcAccounting();
+        let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        let inner = acc.etatParametrable(dbEntries, program_src );
+
+        let elt_file_dest = document.getElementById("id_file_dest"); 
+        let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
+        tbody.innerHTML = inner;
+        let thead_th = elt_file_dest.querySelector('thead th');
+        thead_th.innerText = 'Etat paramétrable';
+        DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
+    }
+
+
+
+
+
+    async evtsig_ctx_deleteLine(event, elt, details) {
         let elt_list = document.getElementById( 'id_lsbx_processes' );
         let mnu_details = DmcContextmenu.getDetails();
         let line = mnu_details.line.innerText;
+
+        let v = await DmcModal.showAsync( "id_dlg_yes_no", 'Delete "'+line+'" : are you sure ?' );
+        if (v.result != 'SUBMIT') return;
+
         WgtListbox.deleteLine (elt_list, line);
         DmcContextmenu.hide();
     }
+
+
 
 /*
     // ================ cmds ======================
@@ -483,17 +587,11 @@ Voici la liste des champs reconnus :
 
 
     async evtsig_test1() {
-        DmcModal.show( "id_dlg_test1", 'This is a form test' );
+        DmcModal.show( "id_dlg_test1", 'Using DmcModal.show with a <div>, not a <dialog>' );
     }
 
-    async evtsig_test2() {
 
-        let txt = 'a,b,â¬,d,Ã©,f,g';
-        DmcModal.show( "id_dlg_test2", binaryUtf8_toString(txt) );
-        
-    }
-
-    async evtsig_test3() {
+    async evtsig_test3_form() {
 
         DmcModal.resetForms( "id_dlg_test3" );
         let v = await DmcModal.showAsync( "id_dlg_test3", 'This is a form test' );
@@ -505,13 +603,8 @@ Voici la liste des champs reconnus :
         }
     }
 
-    async evtsig_test4() {
-        let json =  await this.post_cmd( 'post_get_php_errors', 'testCookie', '42' );
-        app.popup ( 'msg = [' + json.msg + ']' );
-    }
 
-
-    async evtsig_test5() {
+    async evtsig_test5_post_test() {
         let json =  await this.post_cmd( 'post_test', 'testCookie', '42' );
         app.popup ( 'msg = \\n' + json.msg + '\\n' + '' );
     }
@@ -532,15 +625,23 @@ Voici la liste des champs reconnus :
 
     }
 
+
+
     evtsig_about(){
         app.popupHtml(`
 <h2>txt-processor</h2>
-<p><br></p>
-
 <ul>
 <li>&copy; 2023-01  JF Lemay (FR) (contact via github Jeff42820)
     <ul>
-    <li><a href="https://github.com/Jeff42820">github.com/Jeff42820</a></li>
+    <li><a href="https://github.com/Jeff42820" class="help_link" target="_blank">
+        <span class="icon_inline"><img class="icon_inline_scale1_75p" src="icons/github.svg" /> &nbsp; &nbsp;  &nbsp;  &nbsp; </span>
+        github.com/Jeff42820</a>
+    </li>
+    <!--
+    <li><a href="https://jflemay.synology.me/doc" class="help_link" target="_blank">
+        <span class="icon_inline"><img class="icon_inline_scale1_75p" src="icons/server.svg" /> &nbsp; &nbsp;  &nbsp;  &nbsp; </span>
+        jflemay.synology.me/doc</a>
+    </li>  -->
     </ul>
     <br>
 </li>
@@ -566,18 +667,21 @@ SOFTWARE.</pre>
 </li>
 <li>Many thanks to 
     <ul>
-    <li><a href="https://stackoverflow.com/">
-        <img src="icons/stackoverflow.svg" width="32" height="32" />stackoverflow.com</a></li>
-    <li><a href="https://github.com/">
-        <img src="icons/github.svg"        width="32" height="32" />github.com</a></li>
-    <li><a href="https://framework7.io/icons/">
-        <img src="icons/framework7.svg"    width="32" height="32" />framework7.io/icons/</a></li>
+    <li><a href="https://stackoverflow.com/" class="help_link" target="_blank">
+        <span class="icon_inline"><img class="icon_inline_scale_75p" src="icons/stackoverflow.svg" /> &nbsp; &nbsp;  &nbsp;  &nbsp; </span>
+        stackoverflow.com</a></li>
+    <li><a href="https://github.com" class="help_link" target="_blank">
+        <span class="icon_inline"><img class="icon_inline_scale1_75p" src="icons/github.svg" /> &nbsp; &nbsp;  &nbsp;  &nbsp; </span>
+        github.com</a></li> 
+    <li><a href="https://framework7.io/icons/" class="help_link" target="_blank">
+        <span class="icon_inline"><img class="icon_inline_scale1_75p" src="icons/framework7.svg" /> &nbsp; &nbsp;  &nbsp;  &nbsp; </span>
+        framework7.io/icons/</a></li> 
     </ul>
 </li>
 </ul>
 
 
-        `, 30);
+        `, 0);
     }
 
     evtsig_compte() {
@@ -628,8 +732,19 @@ SOFTWARE.</pre>
         let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
         let thead_th = elt_file_dest.querySelector('thead th');
         thead_th.innerText = 'Table';
+        let thead_tr_colnums = document.getElementById('id_colnums')
+
+        let inner='', maxcols = 0;
         let lines = this.elt_file_src.value.split('\\n');
-        let inner='';
+        for (let row=0; row<lines.length; row++) {
+            let cols = columnSplit( lines[row] );
+            if (cols.length > maxcols) maxcols = cols.length;
+        }
+        for (let col=0; col<maxcols; col++) {
+            inner += '<td>'+(col+1)+'</td>';
+        }
+        // thead_tr_colnums.innerHTML = '<tr>'+inner+'</tr>';
+
         for (let row=0; row<lines.length; row++) {
             let line = '<tr>';
             let cols = columnSplit( lines[row] );
@@ -655,7 +770,8 @@ SOFTWARE.</pre>
     async evtsig_reset_log_php() {
         let json =  await this.post_cmd( 'post_reset_php_errors' );
         if (json && !json.error) {
-            app.popupHtml('<i class="f7-icons">hand_thumbsup</i> reset_log_php success', 2);
+            app.popupHtml(  escapeHtml('reset_log_php success ') +  
+                            app.icon('f7-icons', 'hand_thumbsup_fill'), 2);
         } else {
             app.popup('reset_log_php error', 5);            
         }
@@ -688,6 +804,9 @@ SOFTWARE.</pre>
         app.log('evtsig_reset_cookies');
     }
 
+    evtsig_logout () {
+        WgtLogin.do_logout();
+    }
 
     evtsig_copy( ) {
         this.elt_file_src.focus();
@@ -785,6 +904,36 @@ SOFTWARE.</pre>
         this.hideMenu(event);
     }
 
+    /*
+
+    evtsig_keyOnMenuInput(event, elt, details) {
+        if (event.key === 'Enter' || event.keyCode === 13) {
+            app.log('evtsig_keyOnMenuInput '+event.type+' '+event.target.tagName);
+            let parentTd = event.target.parentElement.parentElement;
+            let firstChildSpan = parentTd.firstChild.firstChild;
+            event.preventDefault();
+            firstChildSpan.dispatchEvent( new Event("click") );
+            return false;
+        }
+    }
+    */
+
+
+    evtsig_reportCellIfNextIsEmpty(event, elt, details) {
+        let colNum = this._getLSCookie('reportCellIfNext');  // the column number
+        let cmd = details.slotName + "('"+colNum+"')";
+        this.run_cmd(cmd); 
+
+        this.undo.push( this.elt_file_src.value );
+        // let newOrder = order.split(';');
+        let lines = this.elt_file_src.value;
+        let txt  =  reportCellIfNoNext(lines, colNum);
+        this.elt_file_src.value = txt;
+
+        //app.log('change columns order');
+        this.hideMenu(event);        
+    }
+
     evtsig_changeColumnsOrder(event, elt, details) {
         let order = this._getLSCookie('columnsOrder');  // '¶'
         let cmd = details.slotName + "('"+order+"')";
@@ -799,7 +948,7 @@ SOFTWARE.</pre>
         }
         this.elt_file_src.value = txt;
 
-        app.log('change columns order');
+        //app.log('change columns order');
         this.hideMenu(event);        
     }
 
@@ -816,6 +965,14 @@ SOFTWARE.</pre>
         this.undo.push( this.elt_file_src.value );
         this.elt_file_src.value = removeRepeatedChar(this.elt_file_src.value, '\t');
         app.log('remove extra spaces');
+        this.hideMenu(event);
+    }
+
+    evtsig_removeMoneySign(event, elt, details) {
+        this.run_cmd(details.slotName); 
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = removeMoneySign( this.elt_file_src.value );
+        app.log('remove money sign');
         this.hideMenu(event);
     }
 
@@ -972,7 +1129,10 @@ $html_dialogs = <<<EOLONGTEXT
       <div id="id_dlg_content" class="dm_modal_content">
         <span class="btn_modal_close" data-modal="btn_close">&times;</span>
         <table id="id_file_dest" class="txt_file_dest rounded_div">
-            <thead><tr><th scope="col" colspan="100%">-----</th></tr></thead>
+            <thead>
+            <tr><th scope="col" colspan="100%">-----</th></tr>
+            <tr id="id_colnums"></tr>
+            </thead>
             <tbody>
             </tbody>
         </table>
@@ -1005,19 +1165,31 @@ $html_menu = <<<EOLONGTEXT
                 statusmsg="inside &quot;strings&quot; change char (LF) (\\n) (0x0a) to something else">change in quotes '\\n' to :</label></td>
                 <td><input type="text" LSCookie="CRinQuotesChar" style="width:2em;" /></td></tr>
         </table></form>
+
+        <a signal="click››evtsig_changeDecimalSepFromPoint"
+                statusmsg="from 123.50 to 123,50 [.] =&gt; [,] (no change in quotes)">change decimal separator [.] =&gt; [,]</a>
+
         <form LSCookie="y"><table>
             <tr><td><label signal="click››evtsig_changeColumnsOrder" style="cursor:pointer;"
-                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7>">change columns order</label></td>
+                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7&gt;  or  1;15&sol;(D )(.*)&sol;">change columns order</label></td>
                 <td><input type="text" LSCookie="columnsOrder" style="width:5em;" /></td></tr>
         </table></form>
+
+
+        <form LSCookie="y"><table>
+            <tr><td><label signal="click››evtsig_reportCellIfNextIsEmpty" style="cursor:pointer;"
+                statusmsg="For column number : (columnNum)">report cell if next is empty</label></td>
+                <td><input type="text" LSCookie="reportCellIfNext" style="width:5em;" /></td></tr>
+        </table></form>
+
         <a signal="click››evtsig_removeExtraSpaces"
                 statusmsg="many spaces are changed in only one space (0x20)">remove extra spaces</a>
         <a signal="click››evtsig_removeExtraTabs"
                 statusmsg="many tabs are changed in only one tab (\\t) (0x09) char">remove extra tabs</a>
         <a signal="click››evtsig_removeNoBreakSpaces"
                 statusmsg="char 'no-break space' (&amp;nbsp;) (0xa0) are removed">remove no-break spaces</a>
-        <a signal="click››evtsig_changeDecimalSepFromPoint"
-                statusmsg="from 123.50 to 123,50 [.] =&gt; [,] (no change in quotes)">change decimal separator [.] =&gt; [,]</a>
+        <a signal="click››evtsig_removeMoneySign"
+                statusmsg="char '€£\$' are removed">remove money signs € £ \$</a>
         </div>
     </li>
 
@@ -1027,19 +1199,12 @@ $html_menu = <<<EOLONGTEXT
         <a signal="click››evtsig_copy">copy</a>
         <a signal="click››evtsig_empty">empty</a>
       <!--  <a signal="click››evtsig_parameters">parameters</a>  -->
-        </div>
-    </li>
-    
-    <li id="id_mnu_tests"><a>Tests</a>
-        <div class="div_menu">
         <ul>
             <li><a>tests &vrtri;</a>
                 <div>
-                <a signal="click››evtsig_test1">evtsig_test1</a>
-                <a signal="click››evtsig_test2">evtsig_test2</a>
-                <a signal="click››evtsig_test3">evtsig_test3</a>
-                <a signal="click››evtsig_test4">evtsig_test4</a>
-                <a signal="click››evtsig_test5">evtsig_test5</a>
+                <a signal="click››evtsig_test1">test1 : DmcModal.show with a div</a>
+                <a signal="click››evtsig_test3_form">test3 : DmcModal.showAsync with form</a>
+                <a signal="click››evtsig_test5_post_test">test5 : post_test</a>
                 </div>
             </li>
         </ul>
@@ -1049,9 +1214,11 @@ $html_menu = <<<EOLONGTEXT
         </div>
     </li>
 
-    <li id="id_mnu_calcs"><a>Calcs</a>
+    <li id="id_mnu_calcs"><a  signal="click››evtsig_calcTable">Table</a>
+    </li>
+
+    <li id="id_mnu_calcs"><a>Compta</a>
         <div class="div_menu">
-        <a  signal="click››evtsig_calcTable">Show table</a>
         <a  signal="click››evtsig_grandJournal">Grand Journal</a>
         <a  signal="click››evtsig_balance">Balance</a>
         <form LSCookie="y"><table>
@@ -1070,12 +1237,14 @@ $html_menu = <<<EOLONGTEXT
     <li id="id_mnu_calcs"><a signal="click››evtsig_about">About</a>
     </li>
 
-
 </ul>
 
 
 <ul class="dmc_menu rounded_div">
     <li id="id_mnu_login"><a id="id_a_login" onclick="WgtLogin.showDialog(this);">login</a>
+        <div class="div_menu">
+        <a signal="click››evtsig_logout">Logout</a>
+        </div>
     </li>
 </ul>
 
@@ -1165,28 +1334,38 @@ function main() {
           <div class="dmc_respcardcontainer">
             <div id="id_card1" class="dmc_respcard">
                 <p>Programme</p>
-                <input id="id_cmdlst_title" type="text" class="cmdslist" name="title" 
-                    style="display:block; margin:0 auto; width:97%;" value=""/>
-                <textarea id="id_cmdlst_textarea" class="cmdslist"></textarea>
-                <p><button type="button" signal="click››evtsig_prog_save">
-                 <i class="f7-icons" style="font-size:1.8em; color:#333;">tray_arrow_down_fill</i>
-                 Sauve</button>
-                <button type="button" signal="click››evtsig_prog_run">
-                 <i class="f7-icons" style="font-size:1.8em; color:#333;">play_rectangle_fill</i>
-                 Lance</button>
-                <button type="button" signal="click››evtsig_prog_help">
-                 <i class="f7-icons" style="font-size:1.8em; color:#333;">question_square_fill</i>
-                 Exemple</button></p>
+                <p>Nom: <input id="id_cmdlst_title" type="text" class="program_edit" name="title" 
+                    style=" margin:0 auto; " value=""/>
+
+                <button type="button" class="program_edit" signal="click››evtsig_prog_save" 
+                 statusmsg="Save this program.">
+                 <i class="f7-icons" >tray_arrow_down_fill</i>
+                 </button>
+                <button type="button" class="program_edit" signal="click››evtsig_prog_run"
+                 statusmsg="Run the program and show the result">
+                 <i class="f7-icons" >play_rectangle_fill</i>
+                 </button>
+                <button type="button" class="program_edit" signal="click››evtsig_prog_help"
+                 statusmsg="Run some examples and informations about these programs.">
+                 <i class="f7-icons" >question_square_fill</i>
+                 </button>                    
+                </p>
+
+
+                <textarea id="id_cmdlst_textarea" class="program_edit"
+                    onmouseup="app.event_cmdlst_textarea_onmouseup(event)"
+                    oninput="app.event_cmdlst_textarea_oninput(event)">
+                </textarea>
+                <p></p>
             </div>
 
             <div id="id_card3" class="dmc_respcard">
+                <p><span style="display:inline-block; border-radius:1em;" class="appli_std_color"> &nbsp; <i class="f7-icons" >tray_fill</i> &nbsp;</span> Liste des programmes</p>
                 <fieldset id="id_lsbx_processes"  mwgtclass="WgtListbox" 
                     msignal="item_dblclick››msig_lsbx_processes_dblclick,item_contextmenu››msig_lsbx_processes_cntxtmnu"  
                     data-LSCookie="lsbx_processes_content"
                     class="wgt_listbox wgt_listbox_oneonly" style="max-height:5em;">
-                    <legend>
-                     <i class="f7-icons" style="font-size:1.8em; color:#333;">tray_fill</i>
-                     Liste des programmes</legend> 
+                    <!-- legend ></legend --> 
                 </fieldset>
                 <p>(double-click pour le charger)</p>
                 <p>(click-droite pour le menu ctx)</p>
@@ -1201,6 +1380,7 @@ function main() {
 
         EOLONGTEXT, [ 
             'mod_html_div_dropfile' => $dm->mod_get_elt( 'div-dropfile.mod.php', 'mod_html_div_dropfile' ) 
+
         ] );
 
 /*
