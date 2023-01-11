@@ -159,7 +159,7 @@ function columnSplit( txt, column=';', quote='"' ) {
     let r = [];
 
     let line, last, first, s='', inQuotes=false;
-    let l1, l2;
+    let l1, l2, l3;
     for (first=0, last=0;  last != -1; first = last+1) {
         if (!inQuotes) {
             l1 = txt.indexOf(quote, first);
@@ -174,6 +174,14 @@ function columnSplit( txt, column=';', quote='"' ) {
             }
         } else {
             last = txt.indexOf(quote, first);
+            l3=-1;
+            if (last!=-1) l3=txt.indexOf(quote, last+1);
+            while (l3!=-1 && last!=-1 && l3==last+1){
+                last=txt.indexOf(quote, l3+1);
+                l3=-1;
+                if (last!=-1) l3=txt.indexOf(quote, last+1);
+            }
+
             line = (last == -1) ? txt.slice(first) : txt.slice(first, last);
             //r.push( line );
             r.push( quote+line+quote );
@@ -194,13 +202,13 @@ function columnSplit( txt, column=';', quote='"' ) {
 
 function changeColumn(txt, column='\t', newColumn=';') {
     
-    function changeCell(s) {  return s;  }
+    function changeCell(s, colNum) {  return s;  }
     return _foreachLine( txt, column, newColumn, changeCell );
 
 }
 
 
-function _foreachLine( txt, column, newColumn, fct ){
+function _foreachLine( txt, column, newColumn, fct, colNumber ){
 
     //  for foreach line in string
     //  ===========================
@@ -209,10 +217,12 @@ function _foreachLine( txt, column, newColumn, fct ){
         last = txt.indexOf('\\n', first);
         line = (last == -1) ? txt.slice(first) : txt.slice(first, last);
 
-        let r = columnSplit( line, column ), ns='';
+        let r = columnSplit( line, column ), ns='', nc;
         for (let i=0; i<r.length; i++){
-            if (ns!='') ns += newColumn;
-            ns += fct(r[i]);
+            nc = fct(r[i], i);
+            if (nc === null) continue;
+            if (i!=0) ns += newColumn;
+            ns += nc;
         }
         s += ns + '\\n';
     }
@@ -222,7 +232,7 @@ function _foreachLine( txt, column, newColumn, fct ){
 
 function changeDecimalSepFromPoint(txt) {
 
-    function changeCell(s) {
+    function changeCell(s, colNum) {
         if ( s=='' || isNaN(s) )  return s;
         return s.replace('.', ',');
     }
@@ -235,8 +245,42 @@ function floatToString(num) {
     return num.toFixed(2).replace('.', ',');
 }
 
-//  syntax :    1;2;if+3;if-3;4>5;6>
+
+
+function reportCellIfNoNext(txt, colNumber) {
+    let lastValue = '';
+
+    function changeCell(s, colNum) {
+        if ( colNum+1 != colNumber )  return s;
+
+        if ( !s || s=='' ) {
+            return lastValue;
+        }
+        else {
+            lastValue = s;
+            return s;
+        }
+    }
+
+    return _foreachLine( txt, ';', ';', changeCell, colNumber );
+}
+
+
+function noQuotes(txt) {
+    if (txt.length < 2) return txt;
+    //let c1 = txt[0] ;
+    //let c2 = txt[txt.length-1] ;
+    if (txt[0] != '"' || txt[txt.length-1] != '"') return txt; 
+    let t0 = txt.slice(1, txt.length-1);
+    let t1 = t0.replaceAll(/""/g, '"');
+    let t2 = t1.replaceAll(/\\"/g, '"');
+    return t2;
+}
+
+
+//  syntax :    1;2;if+3;if-3;4>5;6/(D )(.*)/;7>
 //              1;2;3;4;5
+//              changeColumnsOrder('1;2;6;8;10;15/\"([CD]) ([^\/]*)\/(.*)\"/;26;31')
 function changeOrder( line, newOrder ){
 
     let arr =  columnSplit( line );
@@ -244,6 +288,7 @@ function changeOrder( line, newOrder ){
     const regColumn    = /^\d+$/;
     const regColumnIf  = /^if[\\+\\-]\d+$/;
     const regColumnSup = /^(\d+)(\\>)(\d*)$/;
+    const regColumnRegEx =   /^(\d+)(\/)(.*)(\/)$/;         // ex : 1/\"([CD]) ([^\/]*)\/(.*)\"/
     for (let i=0; i<newOrder.length; i++) {
         let op = newOrder[i];
         let v='';
@@ -267,8 +312,30 @@ function changeOrder( line, newOrder ){
             if (found[1] != '') begin = parseInt( found[1] )-1;
             if (found[3] != '') end   = parseInt( found[3] )-1;
             for (let c=begin; c<=end; c++) {
-                if (v == '') v += arr[c];
-                else         v += ' '+arr[c];
+                if (v == '') v += arr[c];        //  noQuotes(arr[c]);
+                else         v += ' '+arr[c];    //  noQuotes(arr[c]);
+            }
+        } else if (regColumnRegEx.test(op)) {
+            const found = op.match(regColumnRegEx);
+            let str1='', match;
+            if (found[1] != '') col = parseInt( found[1] )-1;
+            if (found[3] != '') str1 = found[3];
+            let re = new RegExp(str1, "");
+            let search = arr[col];
+            if (search) match = search.match( re );
+            if (match != null){
+                for (let i=1; i<match.length; i++){
+                    if (v == '') v += match[i];        //  noQuotes(arr[c]);
+                    else         v += ';'+match[i];    //  noQuotes(arr[c]);
+                }
+            } else {                
+                let s = '';
+                if (search)
+                    s = 'regex('+op+') not found in '+search;
+                else
+                    s = '';
+                if (v == '') v += s;        //  noQuotes(arr[c]);
+                else         v += ';'+s;    //  noQuotes(arr[c]);                
             }
         } else {
             v = '?';
@@ -281,7 +348,8 @@ function changeOrder( line, newOrder ){
 
 
 function isNumeric(num) {
-    const reg = /^-?\d+\,?\d*$/;
+    // const reg = /^-?\d+\,?\d*$/;
+    const reg = /^-?[\d\s]+\,?\d*[\s]*€?$/;
     return reg.test(num);
     // return !isNaN(num);
 }
@@ -289,7 +357,7 @@ function isNumeric(num) {
 function parseFloatComma(num) {
     if (!isNumeric(num))
         return NaN;
-    return parseFloat( num.replace(',', '.') );
+    return parseFloat( num.replace(',', '.').replace(/[\s€]/g, '') );
 }
 
 function formatDate_YMD( str ){
@@ -328,6 +396,10 @@ function isDate( str ){
 
 function removeNoBreakSpaces(s) {    
     return s.replaceAll('\xc2\xa0', '');    
+}
+
+function removeMoneySign(s) {
+    return s.replaceAll(/[€£₤₿¥\\\\$]/g, '');    
 }
 
 function from_ISO_8859_15(s) {          // in Mac's world
@@ -570,6 +642,11 @@ function find_encoding(txt, encodings_to_test=null) {
     binaryUtf8_toString(txt, 'windows-1252');    
     binaryUtf8_toString(txt, 'macintosh');
     binaryUtf8_toString(txt, 'utf-8');
+
+    ex:
+    let txt    = 'a,b,â¬,d,Ã©,f,g';
+    let result = 'a,b,€,d,é,f,g';
+    let result = binaryUtf8_toString(txt);
 */
 function binaryUtf8_toString( binaryString, encoding="utf-8" ) {
 
@@ -616,6 +693,20 @@ function trimQuote( s ) {
 
 function trimQuoteArray( _array ) {
     return _array.map( s => trimQuote(s) );
+}
+
+/*
+        new 'typeof' function, which can handle instances & classes
+*/
+function toType(obj) {
+    if (obj === undefined)
+        return 'undefined';
+    // .match(/\s([a-zA-Z]+)/)[1].toLowerCase();
+    if ( typeof obj == 'function' && ({}).toString.call(obj) == '[object Function]')  
+        return 'class '+obj.name;
+    if ( typeof obj == 'object' && ({}).toString.call(obj) == '[object Object]') 
+        return 'instance '+obj.constructor.name;
+    return typeof obj;  
 }
 
 

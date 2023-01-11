@@ -154,6 +154,7 @@ class DmcBase {
 
     static addEventListener_(elt, eventName, slotName, details = undefined) {
         let _class = this;
+        // if (js_debug && eventName == 'dblclick')    console.log('addEventListener_ '+eventName+' slot='+slotName+' class='+this.name);
         elt.addEventListener(eventName, function(e){return _class.signal(slotName, e, this, details);} );
     }
 
@@ -323,6 +324,9 @@ class Application {
             details: details,
             target:  details.fieldset
         };
+        Application.emit(  signal  );
+
+        it is sent to a widget that has a msignal attribute
     */
 
     static emit( signal ){
@@ -403,6 +407,17 @@ class Application {
         // app.log('_slotLSCookieChanged '+attr+' = '+value);
     }
 
+    _keyOnMenuInput(event) {
+        if (event.key === 'Enter' || event.keyCode === 13) {
+            //app.log('evtsig_keyOnMenuInput '+event.type+' '+event.target.tagName);
+            let parentTd = event.target.parentElement.parentElement;
+            let firstChildSpan = parentTd.firstChild.firstChild;
+            event.preventDefault();
+            firstChildSpan.dispatchEvent( new Event("click") );
+            return false;
+        }
+    }
+
     _connectLSCookies() {
         // Connect slots to LSCookie elements
         // ====================================== 
@@ -419,7 +434,8 @@ class Application {
                 let value = this._getLSCookie(attr);
                 if (value == null) value = '';
                 elt.value = value;
-                this.constructor.addEventListener_(elt, 'change', '_slotLSCookieChanged');
+                this.constructor.addEventListener_(elt, 'change',  '_slotLSCookieChanged');
+                this.constructor.addEventListener_(elt, 'keydown', '_keyOnMenuInput');
             }
         }
     }
@@ -525,6 +541,21 @@ class Application {
         });
         return json;
 
+    }
+
+
+    icon( _class, iconName ) {
+
+        // toType( DmcIcons1 ) == 'class DmcIcons1' 
+
+        if ( _class == 'f7-icons' ) 
+            return '<i class="'+_class+'">'+iconName+'</i>';  
+
+        if ( _class == 'icons/svg' ) 
+            return  '<span class="icon_inline"><img class="icon_inline_scale1" src="icons/'+iconName+'" />'+
+                    ' &nbsp; &nbsp; </span> &nbsp; ';
+
+        return '';
     }
 
 
