@@ -805,7 +805,7 @@ SOFTWARE.</pre>
     }
 
     evtsig_logout () {
-        WgtLogin.do_logout();
+        WgtLogin._this.evtsig_logout();
     }
 
     evtsig_copy( ) {
