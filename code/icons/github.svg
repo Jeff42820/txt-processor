@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-   height="32"
+   __height="32"
+   __width="32"
    aria-hidden="true"
    viewBox="0 0 32 32"
    version="1.1"
-   width="32"
    data-view-component="true"
    class="octicon octicon-mark-github v-align-middle"
    id="svg4"
