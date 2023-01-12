@@ -123,18 +123,6 @@ class DmcFramework extends DmcBase {
     }
 
 
-    setStatus( str = null ) {
-        if ( str == null || str == undefined )  str = '';
-        let elt_fw_text = document.getElementById('id_fw_text');
-        elt_fw_text.innerText = str;
-        let exp = this.status_expanded;
-        if (str == '') {
-            elt_fw_text.style.display =    exp ? 'none' : 'inline';
-        } else {
-            elt_fw_text.style.display =    exp ? 'inline' : 'inline';
-        }
-    }
-
     status_expanded_tempo() {
 
         if (this.status_expanded) return false;
@@ -167,10 +155,28 @@ class DmcFramework extends DmcBase {
         setLSCookie(app.name+'fw_status.expanded', exp);
     }
 
+
+    setStatus( str = null ) {
+        // app.log( str ? str : 'null' );  return;
+        if ( str == null || str == undefined )  str = '';
+        let elt_fw_text = document.getElementById('id_fw_text');
+        elt_fw_text.innerText = str;
+        let exp = this.status_expanded;
+        if (str == '') {
+            elt_fw_text.style.display =    exp ? 'none' : 'inline';
+        } else {
+            elt_fw_text.style.display =    exp ? 'inline' : 'inline';
+        }
+    }
+
+
     static _setStatus( event ) {
-        // carefull this object is corrupt here
+        // carefull 'this' object is corrupt here
         // (instead of being DmcFramework class, it is the elt from event)
-        let s = (event.type == 'mouseover') ?  event.target.getAttribute('statusmsg') : null;
+        let elt = event.target;
+        let s = (event.type == 'mouseenter') ?  event.target.getAttribute('statusmsg') : null;
+        // if (!s) { app.log('s is null');  }
+        // app.log(event.type + '=' + elt.tagName + ', id=' + elt.id);
         DmcFramework._this.setStatus( s );
     }
 
@@ -183,12 +189,14 @@ class DmcFramework extends DmcBase {
         for (let i=0; i < elts.length; i++) {
             // if (!elts[i].hasAttribute('statusmsg')) continue;
             let elt = elts[i];
-            if (!elt.onmouseover)
-                // elt.onmouseover = function () {  DmcFramework._this.setStatus( elt.getAttribute('statusmsg') );  }
-                elt.onmouseover = DmcFramework._setStatus;
-            if (!elt.onmouseout)
-                // elt.onmouseout  = function () {  DmcFramework._this.setStatus();  }
-                elt.onmouseout = DmcFramework._setStatus;
+            if (!elt.onmouseenter)   // onmouseover onmouseenter  // onmouseout onmouseleave
+                elt.onmouseenter = DmcFramework._setStatus;
+            if (!elt.onmouseleave)  
+                elt.onmouseleave = DmcFramework._setStatus;
+            /*
+            elt.onmouseenter = function(ev){ app.log('onmouseenter=' + elt.tagName + ', id=' + elt.id);  DmcFramework._setStatus(ev);  }
+            elt.onmouseleave = function(ev){ DmcFramework._setStatus(ev);    app.log('onmouseleave=' + elt.tagName + ', id=' + elt.id);  }
+            */
         }
     }
 

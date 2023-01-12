@@ -138,6 +138,7 @@ class DmcAccounting  {   // extends DmcBase
                         if (s.slice(i).length == 2) s += '0';
                     }
                 }
+                if (s == '-0,00')  s = '0,00';
                 style='style="text-align: right;"';     
                 break;
         }
@@ -188,18 +189,25 @@ class DmcAccounting  {   // extends DmcBase
     journal( dbEntries, journalName = null, CompteName = null ) {
         let innerHtml='';
         let col = this.getColIndexes();
-        let solde = 0.0;
+        let solde = 0.0, numEcr=1;
         let fmt = [ 'DatEcr', 'Journal', 'Compte', 'Libelle', 'Debit', 'Credit' ];
 
         innerHtml +=  '<tr>' + this.createRow( fmt.concat(['Solde']) ) + '</tr>\\n';
 
         for (let row=0; row<dbEntries.length; row++) {
             let entry = dbEntries[row];
+            let style = '';
             if (journalName && entry[col.Journal]!=journalName) continue;
             if (CompteName  && entry[col.Compte] !=CompteName)  continue;
             let x = entry[col.Debit] - entry[col.Credit];
             solde += x;
-            innerHtml +=  '<tr>' + this.journalRow( entry, fmt, solde ) + '</tr>\\n';
+            let modulo = numEcr % 2;
+            if (numEcr % 2 == 0)
+                style = ' style="background-color:#00000015;" ';
+            else
+                style = ' style="background-color:#00000000;" ';
+            innerHtml +=  '<tr'+style+'>' + this.journalRow( entry, fmt, solde ) + '</tr>\\n';
+            if (Math.abs(solde) < 0.00001)  numEcr ++;
         }
         
         let entry    = [ 'Total',  '',        '',       '',        '',       ''  ];
@@ -249,6 +257,7 @@ class DmcAccounting  {   // extends DmcBase
         let _this = this;  // keep for sub function
         let col = this.getColIndexes();
         let methods = method.split('\\n');
+        let soldeonly = false;
 
         function etatParametrableCmd( balance, searchCompte, op, dc ) {
             let r = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };
@@ -309,17 +318,25 @@ class DmcAccounting  {   // extends DmcBase
             }
         }
 
-        let rowSeparator =  '<tr><td> &nbsp; </td><td colspan="3"> &nbsp; </td></tr>\\n';
+        function rowSeparator (soldeonly) {
+            if (soldeonly)
+                return '<tr><td> &nbsp; </td><td> &nbsp; </td></tr>\\n';
+            return '<tr><td> &nbsp; </td><td colspan="3"> &nbsp; </td></tr>\\n';
+        }
 
         let innerHtml='';
         let positive = true;
-        let total = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };
+        let total    = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };
+        let subtotal = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };
         for (let i=0; i<methods.length; i++){
             let cmdText = substrbefore( methods[i], '|').trim();
             let cmd     = substrafter( methods[i], '|').replace(/\s/g,'');
             if (cmd == '' || cmdText.startsWith('//')) continue;
             if (cmd.startsWith(':')) {
                 switch (cmd) {
+                    case ':soldeonly' : 
+                        soldeonly = !soldeonly;
+                        break;
                     case ':positive' :
                         positive = true;
                         break;
@@ -327,19 +344,45 @@ class DmcAccounting  {   // extends DmcBase
                         positive = false;
                         break;
                     case ':separator' :
-                        innerHtml += rowSeparator;
+                        innerHtml += rowSeparator (soldeonly);
                         break;
                     case ':title' :
-                        innerHtml +=  '<tr><td><b>'+escapeHtml(cmdText)+'</b></td><td colspan="3"> &nbsp; </td></tr>\\n';
+                        innerHtml +=  '<tr><td colspan="100%" style="text-align:center; font-size:150%"><b>'+
+                            escapeHtml(cmdText)+'</b></td></tr>\\n';
+                        break;
+                    case ':title1' :
+                        innerHtml +=  '<tr><td><b>'+
+                            escapeHtml(cmdText)+'</b></td>';
+                        if (!soldeonly) {
+                            innerHtml += '<td > &nbsp; </td>';
+                            innerHtml += '<td > &nbsp; </td>';
+                        }
+                        innerHtml += '<td > &nbsp; </td>';
+                        innerHtml += '</tr>\\n';
+                        break;
+                    case ':subtotal' :
+                        innerHtml += '<tr><td><b>'+ escapeHtml( cmdText )+'</b></td>';
+                        if (!soldeonly) {
+                            innerHtml += this._tdFmt( positive ? subtotal.tDebit : -subtotal.tDebit,  'numeric', true );
+                            innerHtml += this._tdFmt( positive ? subtotal.tCredit : -subtotal.tCredit, 'numeric', true );
+                        }
+                        innerHtml += this._tdFmt( positive ? subtotal.sDebit - subtotal.sCredit : subtotal.sCredit - subtotal.sDebit,  'numeric', true );
+                        innerHtml += '</tr>\\n';   
+                        subtotal = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };                     
                         break;
                     case ':columns' :
                         let style='style="text-align: center;"'; 
-                        innerHtml +=  '<tr><td '+style+ '>Libellé</td><td '+style+ '>Débit</td><td '+style+ '>Crédit</td><td '+style +'>Solde</td></tr>\\n';
+                        if (soldeonly) 
+                            innerHtml +=  '<tr><td '+style+ '>Libellé</td><td '+style +'>Solde</td></tr>\\n';
+                        else
+                            innerHtml +=  '<tr><td '+style+ '>Libellé</td><td '+style+ '>Débit</td><td '+style+ '>Crédit</td><td '+style +'>Solde</td></tr>\\n';
                         break;
                     case ':total' :
                         innerHtml += '<tr><td><b>'+ escapeHtml( cmdText )+'</b></td>';
-                        innerHtml += this._tdFmt( positive ? total.tDebit : -total.tDebit,  'numeric', true );
-                        innerHtml += this._tdFmt( positive ? total.tCredit : -total.tCredit, 'numeric', true );
+                        if (!soldeonly) {
+                            innerHtml += this._tdFmt( positive ? total.tDebit : -total.tDebit,  'numeric', true );
+                            innerHtml += this._tdFmt( positive ? total.tCredit : -total.tCredit, 'numeric', true );
+                        } 
                         innerHtml += this._tdFmt( positive ? total.sDebit - total.sCredit : total.sCredit - total.sDebit,  'numeric', true );
                         innerHtml += '</tr>\\n';   
                         total = {  tDebit: 0, tCredit: 0, sDebit: 0, sCredit: 0  };                     
@@ -355,9 +398,13 @@ class DmcAccounting  {   // extends DmcBase
                 }
                 total.tDebit  += t.tDebit;    total.tCredit += t.tCredit;
                 total.sDebit  += t.sDebit;    total.sCredit += t.sCredit;
+                subtotal.tDebit  += t.tDebit;    subtotal.tCredit += t.tCredit;
+                subtotal.sDebit  += t.sDebit;    subtotal.sCredit += t.sCredit;
                 innerHtml += '<tr><td>'+ escapeHtml( cmdText )+'</td>';
-                innerHtml += this._tdFmt( positive ? t.tDebit   : -t.tDebit,   'numeric', false );
-                innerHtml += this._tdFmt( positive ? t.tCredit  : -t.tCredit , 'numeric', false );
+                if (!soldeonly) {
+                    innerHtml += this._tdFmt( positive ? t.tDebit   : -t.tDebit,   'numeric', false );
+                    innerHtml += this._tdFmt( positive ? t.tCredit  : -t.tCredit , 'numeric', false );
+                }
                 innerHtml += this._tdFmt( positive ? t.sDebit - t.sCredit : t.sCredit - t.sDebit,  'numeric', false );
                 innerHtml += '</tr>\\n';                
             } // else
@@ -369,12 +416,14 @@ class DmcAccounting  {   // extends DmcBase
             let c = balance[compte];
             if ( c.Debit == 0 && c.Credit == 0 ) continue;
             if ( needSep ) {  
-                innerHtml += rowSeparator;  needSep = false;   
+                innerHtml += rowSeparator(soldeonly);  needSep = false;   
                 innerHtml +=  '<tr><td><b>Comptes inutilisés</b></td><td colspan="3"> &nbsp; </td></tr>\\n';
             }
             innerHtml += '<tr><td>'+ escapeHtml( 'manquant: '+compte )+'</td>';
-            innerHtml += this._tdFmt( c.Debit,  'numeric', true );
-            innerHtml += this._tdFmt( c.Credit, 'numeric', true );
+            if (!soldeonly) {
+                innerHtml += this._tdFmt( c.Debit,  'numeric', true );
+                innerHtml += this._tdFmt( c.Credit, 'numeric', true );
+            }
             innerHtml += this._tdFmt( c.sDebit - c.sCredit,  'numeric', true );
             innerHtml += '</tr>\\n';
 

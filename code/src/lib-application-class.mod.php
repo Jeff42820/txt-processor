@@ -410,6 +410,7 @@ class Application {
     _keyOnMenuInput(event) {
         if (event.key === 'Enter' || event.keyCode === 13) {
             //app.log('evtsig_keyOnMenuInput '+event.type+' '+event.target.tagName);
+            event.target.dispatchEvent( new Event("change") );
             let parentTd = event.target.parentElement.parentElement;
             let firstChildSpan = parentTd.firstChild.firstChild;
             event.preventDefault();

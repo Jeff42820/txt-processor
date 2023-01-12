@@ -120,9 +120,7 @@ class WgtLogin extends DmcBase {
     constructor() {
         super();
         this.constructor._this = this;
-        this.icon_user='<span class="icon_inline"><img class="icon_inline_scale1" src="icons/user.svg" /> &nbsp; &nbsp; </span> &nbsp; ';
     }
-
 
     static onload ( parent ){
         super.onload( parent );
@@ -130,30 +128,34 @@ class WgtLogin extends DmcBase {
         this.do_login_onload();
     } 
 
-    static async do_login_onload() {
+
+
+    static async post_check_watermark(){
         let lastuser  = app._getLSCookie('LSC_username');
         let watermark = app._getLSCookie('LSC_watermark');
         let wm_time   = app._getLSCookie('LSC_wm_time'); 
-        let link = document.getElementById("id_a_login");
+        if (!lastuser || !watermark || watermark=='') 
+            return false;
 
-        //let wdgt_class =  DmcBase.get_class( 'WgtLogin' );
-        //let icon_user = (wdgt_class) ? wdgt_class.icon_user : '◊◊◊◊ ';
-        let icon_user =  WgtLogin._this.icon_user;
-        if (lastuser && watermark && watermark!='') {
-            let json =  await app.post_cmd( 'post_check_watermark', { user:lastuser, 
-                    watermark:watermark, wm_time:wm_time } );
-            if (json && json.return) {
-                app.log(json.msg + ' age='+ json.age+'s'+ ', post_cmd duration='+json._duration+'ms');
-                link.innerHTML = icon_user + escapeHtml( lastuser );
-            } else {
-                if (json)  app.log(json.msg);
-                app._setLSCookie('LSC_watermark', undefined);
-                app._setLSCookie('LSC_wm_time',   0);
-                link.innerHTML = icon_user + 'Login';
-            }
+        let json =  await app.post_cmd( 'post_check_watermark', 
+            { user:lastuser,  watermark:watermark, wm_time:wm_time } );
+        if (json && json.return) {
+            // success
+            app.log( 'WgtLogin::post_check_watermark '+ json.msg + ' age='+ json.age+'s'+ 
+                     ', post_cmd duration='+json._duration+'ms');
+            return true;
         } else {
-            link.innerHTML = icon_user + 'Login';
+            // if (json)  app.log(json.msg);
+            WgtLogin.do_logout();
+            Application.signal( 'slot_event_logout', null, null, { user:lastuser } );
         }
+        return false;
+    }
+
+    static async do_login_onload() {
+        let lastuser  = app._getLSCookie('LSC_username');
+        let check = await WgtLogin.post_check_watermark ();
+        Application.signal( 'slot_event_login', null, null, { user:lastuser, check:check } );
     }
 
 
@@ -201,40 +203,59 @@ class WgtLogin extends DmcBase {
         document.execCommand("copy");  
     }
 
-    async evtsig_do_login( event, elt ) {
+
+    static async do_logout() {
+        let lastuser  = app._getLSCookie('LSC_username');
+        app._setLSCookie('LSC_watermark', undefined);
+        app._setLSCookie('LSC_wm_time',   0);
+
+        let json =  await app.post_cmd( 'post_logout', { user:lastuser } );
+        // app.log('evtsig_logout user='+lastuser);        
+
+        Application.signal( 'slot_event_logout', null, null );
+    }
+
+
+    static async do_login( user, passw ) {
+
         let elt_username = document.getElementById("username");
-        let elt_password = document.getElementById("password");
-        let dlg = DmcModal.getContainer(elt_username);
+        let elt_dialog = DmcModal.getContainer(elt_username);
+        let elt_result = document.getElementById("id_login_result");
+        let json =  await app.post_cmd( 'post_login', { user:user, password:passw } );
 
-        let lastuser = elt_username.value;
-        if (lastuser != '') {
-            let elt_result = document.getElementById("id_login_result");
-            let json =  await app.post_cmd( 'post_login', { user:lastuser, password:elt_password.value } );
+        if (json && json.watermark != ''){
+            // app.log( JSON.stringify( json ) );              
+            elt_result.innerHTML = escapeHtml('Login successfull ! ') + 
+                    app.icon('f7-icons', 'hand_thumbsup_fill'); // 'hand_thumbsup');  
+            app._setLSCookie('LSC_username',  user);
+            app._setLSCookie('LSC_watermark', json.watermark );   // cryptoUniquePassword()
+            app._setLSCookie('LSC_wm_time',   json.wm_time ); 
 
-            if (json && json.watermark != ''){
-                app.log( JSON.stringify( json ) );
-                elt_result.innerText = 'Login successfull !';  // \\n watermark='+json.watermark
-                app._setLSCookie('LSC_username',  lastuser);
-                app._setLSCookie('LSC_watermark', json.watermark );   // cryptoUniquePassword()
-                app._setLSCookie('LSC_wm_time',   json.wm_time ); 
+            DmcModal.resetForms( elt_dialog.id );
+            elt_username.value = user;
 
-                DmcModal.resetForms( dlg.id );
-                elt_username.value = lastuser;
-                let link = document.getElementById("id_a_login");
-                link.innerHTML = this.icon_user +   escapeHtml( lastuser );
-                DmcModal._setTimeout( dlg, 2 );
-            }
-            else {
-                if (!json){
-                    app.log( 'json is null' );
-                    elt_result.innerText = 'Login error';
-                } else {
-                    elt_result.innerText = json.msg;
-                }
+            Application.signal( 'slot_event_login', null, null, { user:user, check:true } );
+
+            DmcModal._setTimeout( elt_dialog, 1 );
+        }
+        else {
+            if (!json){
+                app.log( 'WgtLogin::do_login error : post_login json is null' );
+                elt_result.innerText = 'Login error';
+            } else {
+                elt_result.innerText = json.msg;
             }
         }
 
-        // app.log('evtsig_do_login user='+lastuser);        
+    }
+
+
+    evtsig_do_login( event, elt ) {
+        let elt_username = document.getElementById("username");
+        let elt_password = document.getElementById("password");
+        if (elt_username.value != '') {
+            WgtLogin.do_login( elt_username.value, elt_password.value  );
+        }
     }
 
     evtsig_do_create() {
@@ -260,22 +281,14 @@ class WgtLogin extends DmcBase {
     async evtsig_logout( event, elt ) {
         let elt_username = document.getElementById("username");
         let lastuser = elt_username.value;
-
         let dlg = DmcModal.getContainer(elt_username);
-        app._setLSCookie('LSC_watermark', undefined );
+
+        WgtLogin.do_logout();
 
         DmcModal.resetForms( dlg.id );
         DmcModal.resetForms( dlg.id );
         elt_username.value = '';
-        DmcModal._setTimeout( dlg, 2 );  // DmcModal.hide( dlg.id, null );
-
-
-        let link = document.getElementById("id_a_login");
-        // let lastuser = link.innerText.trim();
-        link.innerHTML = this.icon_user + 'Login';
-
-        let json =  await app.post_cmd( 'post_logout', { user:lastuser } );
-        app.log('evtsig_logout user='+lastuser);        
+        DmcModal._setTimeout( dlg, 10 );  // DmcModal.hide( dlg.id, null );
     }
 
 

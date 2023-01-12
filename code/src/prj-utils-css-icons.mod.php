@@ -50,6 +50,12 @@ span.icon_inline img.icon_inline_scale2 {
     transform: translateX(-50%) translateY(-50%) translateY(-0.1em) scale(2);  
 }
 
+span.icon_inline img.icon_inline_scale1_75p {
+    transform: translateX(-50%) translateY(-50%) translateY(-0.1em) scale(0.75);  
+}
+
+
+
 
 
 

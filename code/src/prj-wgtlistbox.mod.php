@@ -21,7 +21,7 @@ EOLONGTEXT );  // mod_html_div_wgtlistbox
 CModules::append( 'mod_js_class_WgtListbox', <<<EOLONGTEXT
 
 
-
+// var js_debug = true;
 
 class WgtListbox extends DmcBase {
 
@@ -35,30 +35,66 @@ class WgtListbox extends DmcBase {
         this.constructor._wgt_data = {};
     }
 
-    static onload( parent ) {
-        super.onload( parent );
-        this.load_wgt_data( parent );
-        this.connect_events( parent );        
-    }
-
-
     static get_root_elt_selector() {
         return  'fieldset.wgt_listbox';
+    }
+
+    static onload( parent ) {
+        super.onload( parent );
+        this.connect_events( parent );        
     }
 
     static connect_events( parent ) {
         super.connect_events( parent );
 
+        // if (js_debug)  console.log('WgtListbox::connect_events');
         if (parent == undefined)  parent = document.body;
         let elts = parent.querySelectorAll('fieldset.wgt_listbox');
         for (let e=0; e<elts.length; e++) {
             let fieldset = elts[e];
-            this.connect_events_wdgt (fieldset);
+            this.load_wgt_data_fieldset( fieldset );
+            // this.connect_events_wdgt ( fieldset );  // no : already connected by load_wgt_data_fieldset
+        }
+    }
+
+
+    static load_wgt_data_fieldset( fieldset ) {
+        // if (js_debug)  console.log('WgtListbox::load_wgt_data_fieldset for '+fieldset.id);
+
+        let cookieName = fieldset.getAttribute( 'data-LSCookie' );
+        let data = { LSCookie: cookieName, listdata: {} };
+        let json = null; 
+        if (cookieName)  json = getLSCookie( app.name + cookieName );
+
+        if (cookieName && json) {
+            // a cookie exists : apply values found 
+            // -----------
+            let listdata = {}; 
+            try {
+                listdata = JSON.parse(json);
+            } catch(e) {
+                app.log('WgtListbox::load_wgt_data_fieldset error bad cookie in data-LSCookie');
+            }
+            this.set_wgt_data( fieldset, data );
+            let list = Object.keys(listdata);
+            this.setLines ( fieldset, list, listdata );
+
+        } else {
+            // no cookie : get html elements
+            // -----------
+            let items = fieldset.querySelectorAll('p');
+            for (let l=0; l<items.length; l++) {
+                let item = items[l].innerText;
+                data[item] = {};
+            }
+            this.set_wgt_data( fieldset, data );   // initialize wgt_data
         }
     }
 
 
     static connect_events_wdgt (fieldset) {
+        // if (js_debug)  console.log('WgtListbox::connect_events_wdgt for '+fieldset.id);
+
         let lines = fieldset.querySelectorAll('p');
         for (let l=0; l<lines.length; l++) {
             let elt = lines[l];
@@ -69,6 +105,7 @@ class WgtListbox extends DmcBase {
             this.addEventListener_(elt, 'contextmenu', 'slot_contextmenu', details);
         }
     }
+
 
     static set_innerHTML (fieldset, txt) {
         fieldset.innerHTML =  txt;
@@ -119,50 +156,6 @@ class WgtListbox extends DmcBase {
 
 
 
-
-    static load_wgt_data_fieldset( fieldset ) {
-
-        let cookieName = fieldset.getAttribute( 'data-LSCookie' );
-        let data = { LSCookie: cookieName, listdata: {} };
-
-        let json = null; 
-        if (cookieName) 
-            json = getLSCookie( app.name + cookieName );
-
-        if (cookieName && json) {
-            // a cookie exists : apply values found 
-            // -----------
-            let listdata = {}; 
-            try {
-                listdata = JSON.parse(json);
-            } catch(e) {
-                app.log('WgtListbox::load_wgt_data error bad cookie in data-LSCookie');
-            }
-            this.set_wgt_data( fieldset, data );
-            let list = Object.keys(listdata);
-            this.setLines ( fieldset, list, listdata );
-
-        } else {
-            // no cookie : get html elements
-            // -----------
-            let items = fieldset.querySelectorAll('p');
-            for (let l=0; l<items.length; l++) {
-                let item = items[l].innerText;
-                data[item] = {};
-            }
-            this.set_wgt_data( fieldset, data );   // initialize wgt_data
-        }
-    }
-
-
-
-    static load_wgt_data( parent ) {
-        if (parent == undefined)  parent = document.body;
-        let elts = parent.querySelectorAll('fieldset.wgt_listbox');
-        for (let e=0; e<elts.length; e++) {
-            this.load_wgt_data_fieldset( elts[e] );
-        }
-    }
 
     static set_wgt_data( fieldset, details = {} ) {
         this._wgt_data[fieldset.id] = details;
@@ -245,6 +238,7 @@ class WgtListbox extends DmcBase {
 
 
     slot_dblclick( event, elt, details ) {
+        app.log('slot_dblclick ev='+event.target+', time='+event.timeStamp+', scr'+event.screenX);
         let oneonly = details.fieldset.classList.contains( 'wgt_listbox_oneonly' );
         if (!oneonly) return;
 
@@ -334,11 +328,11 @@ fieldset.wgt_listbox {
 
 
 fieldset.wgt_listbox  legend {
-    background-color: #0000;      
+    background-color: var(--main_color);  
 }
 
 fieldset.wgt_listbox_oneonly  legend {
-    background-color: #0000;    
+    background-color: var(--main_color);  
 }
 
 fieldset.wgt_listbox p {

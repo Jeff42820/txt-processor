@@ -421,11 +421,7 @@ class CMainPhp {                    // base class for CPrjMain
 
     function post_test( & $data, $args ) {
 
-        $this->get_userdb( $ob );
-
-        $data['file']  = print_r( $ob, true );
-        $data['msg']  = print_r( $_POST, true );
-        $data['msg']  = print_r( $_SESSION, true );
+        $data['msg']  = "\$_POST var = ".print_r( $_POST, true );
         
     }
 
