@@ -18,7 +18,7 @@ CModules::append( 'mod_html_div_dropfile', <<<EOLONGTEXT
     <p>
     <span class="icon_inline"  onclick="DmcDropfile.ev_choosefile()" 
         style="cursor:pointer;"><img class="icon_inline_scale1" src="icons/dropfile.svg" /> &nbsp; &nbsp; </span> &nbsp; 
-        Drag-drop your file here
+        Drag-drop your<br>file here
     </p>
     <form class="div_dropfile_select">
         <!-- input type="button" value="Select a file" onclick="DmcDropfile.ev_choosefile()" / -->
@@ -94,7 +94,7 @@ class DmcDropfile extends DmcBase {
                     }
                 }        );
 
-        app.log('DmcDropfile::post_file end ok r='+r);
+        // app.log('DmcDropfile::post_file end ok r='+r);
         return r;
     }
 
@@ -200,7 +200,7 @@ div.drag_style_over {
 }
 
 div.div_dropfile {
-  width:20em;
+  min-width:10em;
   text-align:center;
   color: white;
   background-color: var(--main_color);   /*  #ff6b30;  */

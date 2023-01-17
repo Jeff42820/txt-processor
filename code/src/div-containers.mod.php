@@ -125,7 +125,7 @@ class DmcContainers extends DmcBase {
         };
         Application.emit(  signal  );
 
-        DmcModal.moveWindow = null;
+        DmcContainers.moveWindow = null;   //     DmcModal
         event.preventDefault();      
         return false;
     }
@@ -136,7 +136,7 @@ class DmcContainers extends DmcBase {
         let newHeight = (m._initialHeight-pt.y) + 'px';
         m._eltFix.style.height = newHeight;
 
-        DmcModal.moveWindow = m;
+        DmcContainers.moveWindow = m;    //     DmcModal
         // app.log('onmousemove_sep elt='+m._eltFix.id+', newHeight='+ newHeight );
         event.preventDefault();      
         return false;

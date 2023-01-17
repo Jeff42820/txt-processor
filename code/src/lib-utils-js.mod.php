@@ -208,7 +208,30 @@ function changeColumn(txt, column='\t', newColumn=';') {
 }
 
 
-function _foreachLine( txt, column, newColumn, fct, colNumber ){
+function removeQuotes(txt) {
+    // inQuotes     ‖  ⁏ 
+    const newSemicolon = '‚';       // '⁏⁝'
+    const newQuote     = '‖';       // '⁏'    
+
+    const MAP = {  '"': newQuote, ';': newSemicolon  };
+    const reg = /[";]/g;
+
+    function changeCell(s, colNum) {  
+        if (s.length<2) return s;
+        if (s[0]!='"' || s[s.length-1]!='"') return s;
+
+        let     ss = s.slice(1, s.length-1);
+        ss = ss.replace( '""', newQuote );
+        ss = ss.replace(reg, function (c) { return MAP[c]; });
+        return ss;
+    }
+
+    return _foreachLine( txt, ';', ';', changeCell );
+
+}
+
+
+function _foreachLine( txt, column, newColumn, fct, colNumber, nullRemoveRow = false ){
 
     //  for foreach line in string
     //  ===========================
@@ -220,10 +243,13 @@ function _foreachLine( txt, column, newColumn, fct, colNumber ){
         let r = columnSplit( line, column ), ns='', nc;
         for (let i=0; i<r.length; i++){
             nc = fct(r[i], i);
-            if (nc === null) continue;
+            if (!nullRemoveRow && nc === null) continue;
+            if (nullRemoveRow  && nc === null) break;
             if (i!=0) ns += newColumn;
             ns += nc;
         }
+        if (nullRemoveRow && nc === null)
+            continue;
         s += ns + '\\n';
     }
     return s;
@@ -238,6 +264,111 @@ function changeDecimalSepFromPoint(txt) {
     }
     return _foreachLine( txt, ';', ';', changeCell );
 
+}
+
+
+
+function removeRowIfNoDate(txt, colNumber){
+
+    function _isDate(s) {
+        const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; 
+        const found = s.match( reg );
+        if ( !found ) return false;
+        let day   = parseInt( found[1] );
+        let month = parseInt( found[2] );
+        let year  = parseInt( found[3] );
+        if (day<1   || day>31) return false;
+        if (month<1 || month>12) return false;
+        if (year >= 0     && year <= 99)   return true;       // year is 2 digits ?
+        if (year >= 2000  && year <= 2100) return true;       // year is 4 digits ?
+        return false;
+    }
+
+    function _removeRowIf(s, colNum) {
+        if (colNum+1 != colNumber) return s;
+
+        // if (s=='') return s;
+        let ss = s;
+        if (ss.length>=2 && ss[0]=='"' && ss[s.length-1]=='"') 
+            ss = ss.slice(1, ss.length-1);
+
+        let start = ss.toLowerCase().slice(0,3);
+        if (start == 'dat') return s;
+
+        if (!_isDate(ss))
+            return null;
+        return s;
+    }
+
+    return _foreachLine( txt, ';', ';', _removeRowIf, colNumber, true );
+}
+
+
+
+
+
+function dateToComptaDate(txt) {
+
+    function digits2(n){
+        if (n>2000) n = n-2000;
+        return n > 9 ? "" + n: "0" + n;
+    }
+
+    function _comptaDate1(s, colNum) {
+        if (s=='') return s;
+        let ss = s;
+        if (ss.length>=2 && ss[0]=='"' && ss[s.length-1]=='"') 
+            ss = ss.slice(1, ss.length-1);
+        const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; 
+        const found = ss.match( reg );
+        if ( !found ) return s;
+
+        let day   = parseInt( found[1] );
+        let month = parseInt( found[2] );
+        let year  = parseInt( found[3] );
+        if (day<1   || day>31) return s;
+        if (month<1 || month>12) return s;
+        return year+'-'+digits2(month)+'-'+digits2(day);
+    }
+
+
+    function _comptaDate(s, colNum) {
+        if (s=='') return s;
+        let ss = s;
+        if (ss.length>=2 && ss[0]=='"' && ss[s.length-1]=='"') 
+            ss = ss.slice(1, ss.length-1);
+
+        const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; 
+        const found = ss.match( reg );
+        if ( !found ) return s;
+
+        let day   = parseInt( found[1] );
+        let month = parseInt( found[2] );
+        let year  = parseInt( found[3] );
+        if (day<1   || day>31) return s;
+        if (month<1 || month>12) return s;
+        return digits2(day)+'/'+digits2(month)+'/'+digits2(year);
+    }
+
+    return _foreachLine( txt, ';', ';', _comptaDate );
+}
+
+
+
+function trimEachCell(txt) {
+
+    function trimCell(s, colNum) {
+        if (s=='') return s;
+        if (s.length>=2 && s[0]=='"' && s[s.length-1]=='"') {
+            s = s.slice(1, s.length-1);
+            s = '"' + s.trim() + '"';
+            return s;
+        }
+        s = s.trim();
+        return s;
+    }
+
+    return _foreachLine( txt, ';', ';', trimCell );
 }
 
 
@@ -280,15 +411,17 @@ function noQuotes(txt) {
 
 //  syntax :    1;2;if+3;if-3;4>5;6/(D )(.*)/;7>
 //              1;2;3;4;5
+//              1;2;3;4;if|3=D|+4
 //              changeColumnsOrder('1;2;6;8;10;15/\"([CD]) ([^\/]*)\/(.*)\"/;26;31')
 function changeOrder( line, newOrder ){
 
     let arr =  columnSplit( line );
     let s = '';
-    const regColumn    = /^\d+$/;
-    const regColumnIf  = /^if[\\+\\-]\d+$/;
-    const regColumnSup = /^(\d+)(\\>)(\d*)$/;
-    const regColumnRegEx =   /^(\d+)(\/)(.*)(\/)$/;         // ex : 1/\"([CD]) ([^\/]*)\/(.*)\"/
+    const regColumn     = /^\d+$/;
+    const regColumnIf   = /^if[\\+\\-]\d+$/;
+    const regColumnIf2  = /^if\\|(\d+)=([^|]+)\\|([\\+\\-])(\d+)$/;    //     if|3=Some|+4
+    const regColumnSup  = /^(\d+)(\\>)(\d*)$/;
+    const regColumnRegEx =   /^(\d+)(\/)(.*)(\/)$/;            // ex : 1/\"([CD]) ([^\/]*)\/(.*)\"/
     for (let i=0; i<newOrder.length; i++) {
         let op = newOrder[i];
         let v='';
@@ -306,6 +439,24 @@ function changeOrder( line, newOrder ){
                 if (num != NaN && sign == '+' && num>=0)   v = floatToString( num );
                 if (num != NaN && sign == '-' && num< 0)   v = floatToString( num );
             }                
+        } else if (regColumnIf2.test(op)) {
+            const found = op.match(regColumnIf2);
+            const colNumTest = parseInt( found[1] )-1;
+            const colNumVal = parseInt( found[4] )-1;
+            const txtEqual = found[2];
+            const sign = found[3];
+            let s='';
+            if (arr[colNumTest] == txtEqual) {
+                if (isNumeric(arr[colNumVal])) {
+                    num = parseFloatComma(arr[colNumVal]);
+                    if (num != NaN && sign == '+')   s = floatToString(  num );
+                    if (num != NaN && sign == '-')   s = floatToString( -num );
+                } else {
+                    s = arr[colNumVal];
+                }
+            }
+            v = s;
+            // app.log('regColumnIf2');
         } else if (regColumnSup.test(op)) {
             const found = op.match(regColumnSup);
             let begin = 0, end = arr.length-1;
@@ -360,15 +511,15 @@ function parseFloatComma(num) {
     return parseFloat( num.replace(',', '.').replace(/[\s€]/g, '') );
 }
 
-function formatDate_YMD( str ){
+function formatDate_YMD( str, datefmts = undefined ){
     const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; //   /^\d{1,2}\/\d{1,2}\/\d{1,4}$/;
     const found = str.match( reg );
     if ( !found ) return false;
     let day   = parseInt( found[1] );
     let month = parseInt( found[2] );
     let year  = parseInt( found[3] );
-    if (year>=0 || year<=60) year = 2000+year;
-    else if (year>60 || year<=99) year = 1900+year;
+    if (year>=0 && year<=60) year = 2000+year;
+    else if (year>60 && year<=99) year = 1900+year;
     if (day<1   || day>31) return false;
     if (month<1 || month>12) return false;
 
@@ -380,17 +531,22 @@ function formatDate_YMD( str ){
 
 
 
-function isDate( str ){
+function isDate_slash( str ){
     const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; //   /^\d{1,2}\/\d{1,2}\/\d{1,4}$/;
     const found = str.match( reg );
     if ( !found ) return false;
     let day   = parseInt( found[1] );
     let month = parseInt( found[2] );
     // let year  = parseInt( found[3] );
-    if (day<1   || day>31) return false;
-    if (month<1 || month>12) return false;
+    // if (day<1   || day>31) return false;
+    // if (month<1 || month>12) return false;
     return true;
     // return !isNaN(num);
+}
+
+function setCharAt(str,index,chr) {
+    if(index > str.length-1) return str;
+    return str.substring(0,index) + chr + str.substring(index+1);
 }
 
 

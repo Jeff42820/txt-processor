@@ -55,7 +55,7 @@ class DmcAccounting  {   // extends DmcBase
 
     }
 
-    formatEntry( e ) {
+    formatEntry( e, datefmts=undefined ) {
         let newEntry = [].concat(e);        // Object.assign({}, e);
         for (let c=0; c<this.colNames.length; c++) {
             let v = e[c];
@@ -66,7 +66,11 @@ class DmcAccounting  {   // extends DmcBase
                 case 'numeric':
                     newEntry[c] =  (v!='') ? parseFloat( v.replace(',', '.') ) : 0;    break;
                 case 'date':
-                    newEntry[c] =  formatDate_YMD( v );                  break;
+                    if (datefmts)
+                        newEntry[c] =  formatDate_YMD( v, datefmts );
+                    else  
+                        newEntry[c] =  formatDate_YMD( v );
+                    break;
                 case 'empty': 
                     newEntry[c] =  '';                                   break;
                 default: 
@@ -76,11 +80,28 @@ class DmcAccounting  {   // extends DmcBase
         return newEntry;
     }
 
-    recognizeType( str ) {
-        if (str == '')          return 'empty';
-        if (isDate( str ))      return 'date';
-        if (isNumeric( str ))   return 'numeric';
-        return                  'string';            
+    recognizeType( str, datefmt = undefined ) {
+        if (str == '')                  return 'empty';
+        if (isDate_slash( str ))  {
+            if (datefmt){
+                const reg = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/; //   /^\d{1,2}\/\d{1,2}\/\d{1,4}$/;
+                const f = str.match( reg );
+                if ( f ) {
+                    let f1 = parseInt( f[1] );
+                    let f2 = parseInt( f[2] );
+                    let f3 = parseInt( f[3] );
+                    datefmt.f1.min = Math.min(datefmt.f1.min, f1);
+                    datefmt.f1.max = Math.max(datefmt.f1.max, f1);
+                    datefmt.f2.min = Math.min(datefmt.f2.min, f2);
+                    datefmt.f2.max = Math.max(datefmt.f2.max, f2);
+                    datefmt.f3.min = Math.min(datefmt.f3.min, f3);
+                    datefmt.f3.max = Math.max(datefmt.f3.max, f3);
+                }
+            }
+            return 'date';
+        }
+        if (isNumeric( str ))           return 'numeric';
+        return                          'string';            
     }
 
     loadEntries( txt ) {
@@ -94,6 +115,11 @@ class DmcAccounting  {   // extends DmcBase
         this.colTypes_ = Array( this.colNames.length );
         for (let c=0; c<this.colTypes.length; c++){    this.colTypes[c] = {  empty:0, date:0, numeric:0, string:0 };  }
 
+        let  datefmt = {
+            f1 : { min: 9999999,  max: -9999999 },
+            f2 : { min: 9999999,  max: -9999999 },
+            f3 : { min: 9999999,  max: -9999999 }
+        }
         for (let n=1; n<lines.length; n++) {
             if ( lines[n] == '' ) continue;
             let entry = columnSplit( lines[n] );
@@ -101,9 +127,23 @@ class DmcAccounting  {   // extends DmcBase
             if (entry.length<maxlen) maxlen = entry.length;
             for (let c=0; c<maxlen; c++){
                 let ival = (c<entry.length) ? entry[c] : '';
-                let itype = this.recognizeType(ival);
+                let itype = this.recognizeType(ival, datefmt);
                 this.colTypes[c][itype]++;
             }
+        }
+
+        let datefmts = '';
+        if ( datefmt.f1.max >  12 && datefmt.f1.max <= 31 ) {
+            datefmts += 'dd/';
+            datefmts += 'mm/';
+        } else if ( datefmt.f2.max >  12 && datefmt.f2.max <= 31 ) {
+            datefmts += 'mm/';
+            datefmts += 'dd/';
+        }
+        if ( datefmt.f3.max >= 0 && datefmt.f3.max <= 99 ) {
+            datefmts += 'yy';
+        } else if ( datefmt.f3.max >= 2000 && datefmt.f3.max <= 2200 ) {
+            datefmts += 'yyyy';
         }
 
         let s = '';
@@ -116,7 +156,7 @@ class DmcAccounting  {   // extends DmcBase
         for (let n=1; n<lines.length; n++) {
             if ( lines[n] == '' ) continue;
             let entry = columnSplit( lines[n] );
-            dbEntries.push( this.formatEntry( entry ) );
+            dbEntries.push( this.formatEntry( entry, datefmts ) );
         }
 
         return dbEntries;

@@ -27,6 +27,10 @@ class CMainPhp {                    // base class for CPrjMain
 
     public function __construct() {
         $this->date_start = date("Y-m-d_H:i:s");
+        $_SESSION['news']  = [];
+        $_SESSION['hour'] = date("Y-m-d_H:i");
+        if ( !isset($_SESSION['wm_tic']) )   $_SESSION['wm_tic'] = 0;
+
         if ( isset($_SERVER['PHP_AUTH_USER']) ) 
             $this->user=$_SERVER['PHP_AUTH_USER'];
         // echo "DefTimezone = ".date_default_timezone_get(), $CR;
@@ -400,22 +404,47 @@ class CMainPhp {                    // base class for CPrjMain
         $time = time();
         $_SESSION['tic']  = $time;
 
+        $data['news']  = '';
+
         // ======================
         //  check watermark
         // ======================
         $this->get_userdb( $ob );
+        /*     error if user is not in $ob
+        try {
+            $z2 = $ob[ $args[0]->user ];
+        } catch (Exception $e){
+            $data['news']  .= 'unknown user '.$args[0]->user;
+        }
+        */
         $watermark  = $this->calcWaterMark( $args[0]->user, $ob[ $args[0]->user ], $args[0]->wm_time );
         if ( $watermark == $args[0]->watermark )  {
             $data['return']  = true;
             $_SESSION['wm_tic']  = $time;
         }
 
+
+        // =========================
+        //  is it a new hh:mm ?
+        // =========================
+        $hour = date("Y-m-d_H:i");
+        if ( !isset($_SESSION['hour']) )   $_SESSION['hour'] = $hour;
+        if ( $_SESSION['hour'] != $hour ) {
+            // create new information :
+            $_SESSION['news'][$time] = [
+                 'msg'    => "now is is ".$hour
+                ];
+            $data['news']  .= 'welcome in hour  = '.$hour.' before value was '.$_SESSION['hour'];
+            $_SESSION['hour'] = $hour; 
+        }
+
         // =========================
         //  check the php log file
         // =========================
-        $data['news']  = '';
         if (filesize('rw/error_php.log'))
             $data['news']  .= 'There is something in error_php.log';
+
+
         $data['msg']  = "CMainPhp::post_tic time={$time}";
     }
 

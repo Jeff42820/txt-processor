@@ -238,7 +238,7 @@ class WgtListbox extends DmcBase {
 
 
     slot_dblclick( event, elt, details ) {
-        app.log('slot_dblclick ev='+event.target+', time='+event.timeStamp+', scr'+event.screenX);
+        //app.log('slot_dblclick ev='+event.target+', time='+event.timeStamp+', scr'+event.screenX);
         let oneonly = details.fieldset.classList.contains( 'wgt_listbox_oneonly' );
         if (!oneonly) return;
 
