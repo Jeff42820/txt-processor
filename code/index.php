@@ -189,6 +189,7 @@ class ApplicationTest extends Application {
         'test1' :               'default value',
         'columnsOrder' :        '1;2;3;4;5;6;7;8;9;10',
         'reportCellIfNext' :    '1',
+        'removeRowIfNoDate' :   '1',
         'CRinQuotesChar' :      '¶',
         'internationalParams' : '{"decimalSeparator":",","columnSeparator":";","currencySymbol":"€","dateFormat":"dd/mm/yyyy"}'
     };
@@ -201,7 +202,8 @@ class ApplicationTest extends Application {
     }
 
     async timer () {
-        // const sec =  Math.floor(Date.now() / 1000.0);
+        const sec =  Math.floor(Date.now() / 1000.0);
+        let icon = (sec % 2) == 0;
 
         let lastuser  = app._getLSCookie('LSC_username');
         let watermark = app._getLSCookie('LSC_watermark');
@@ -209,13 +211,29 @@ class ApplicationTest extends Application {
 
         let json =  await this.post_cmd( 'post_tic', { user:lastuser, 
                     watermark:watermark, wm_time:wm_time } );
-        if (json && json.return) {
-            if (json._duration > 200)
-                app.log('ApplicationTest::timer post_tic returns=' + json.return + ', duration='+json._duration );
+
+        if (!json) {
+            app.log( 'ApplicationTest::timer post_tic returns null json' );
+            return;
         }
 
-        if (json && json.news != '')
-            app.log('ApplicationTest::timer post_tic news=' + json.news );
+        // heart beat is ok : 
+        let elt_php_connected = document.getElementById("id_php_connected");
+
+        elt_php_connected.style.color = icon ? 'black' : 'white';
+
+        // signal a slow communication :
+        if (json.return && json._duration > 200) {
+            app.log('ApplicationTest::timer post_tic returns=' + 
+                    json.return + ', duration=' + 
+                    json._duration );
+        }
+
+        // if there are news ....
+        if (json.news != '') {
+            // app.log('ApplicationTest::timer post_tic news=' + json.news );
+        }
+        
     }
 
     // ========= hack ===========
@@ -276,13 +294,6 @@ class ApplicationTest extends Application {
 
 
 
-    run_cmd(cmd){
-        // id_cmdlst_textarea   program_edit
-        if (cmd.startsWith('evtsig_'))
-            cmd = cmd.substring(7);
-        if (this.elt_cmdlst_textarea.value) this.elt_cmdlst_textarea.value += "\\n";
-        this.elt_cmdlst_textarea.value += cmd;
-    }
 
     // ========= evtsig ===========
     // ===========================
@@ -365,12 +376,302 @@ Voici la liste des champs reconnus :
     }
 
 
-    evtsig_prog_run() {  // evtsig_etatparametrable
-        let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+    etatParametrable(method) {  
+        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
 
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        let inner = acc.etatParametrable(dbEntries, method );
+        let elt_file_dest = document.getElementById("id_file_dest"); 
+        let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
+        tbody.innerHTML = inner;
+        let thead_th = elt_file_dest.querySelector('thead th');
+        thead_th.innerText = 'Etat paramétrable';
+        DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
 
+    }
+
+
+    reportCellIfNextIsEmpty(colNum) {
+        if (typeof colNum == 'string')
+            colNum = parseInt( colNum, 10 );
+        let txt  =  reportCellIfNoNext(this.elt_file_src.value, colNum);
+        this.elt_file_src.value = txt;
+    }
+
+    evtsig_reportCellIfNextIsEmpty(event, elt, details) {
+        this.hideMenu(event); 
+        this.undo.push( this.elt_file_src.value );
+
+        let colNum = this._getLSCookie('reportCellIfNext');
+        this.reportCellIfNextIsEmpty(colNum);
+        this.add_cmd_to_prog('reportCellIfNextIsEmpty', ''+colNum );
+
+    }
+
+
+    changeColumnsOrder( order ) {
+        let newOrder = order.split(';');
+        let lines = this.elt_file_src.value.split('\\n');
+        let txt='';
+        for (let row=0; row<lines.length; row++) {
+            txt += changeOrder( lines[row], newOrder ) + '\\n';
+        }
+        this.elt_file_src.value = txt;
+    }
+
+    evtsig_changeColumnsOrder(event, elt, details) {
+        this.hideMenu(event);        
+        this.undo.push( this.elt_file_src.value );
+        let order = this._getLSCookie('columnsOrder');  // '¶'
+        this.changeColumnsOrder( order );
+        this.add_cmd_to_prog('changeColumnsOrder', "'"+order+"'"); 
+    }
+
+
+    decodeFromISO_8859_15() {
+        this.elt_file_src.value = from_ISO_8859_15( this.elt_file_src.value );
+    }
+
+    evtsig_decodeFromISO_8859_15(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.decodeFromISO_8859_15();
+        this.add_cmd_to_prog('decodeFromISO_8859_15'); 
+    }
+
+
+    removeExtraSpaces() {
+        this.elt_file_src.value = trimEachCell( removeRepeatedChar(this.elt_file_src.value, '\\u0020') );
+    }
+
+    evtsig_removeExtraSpaces(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.removeExtraSpaces();
+        this.add_cmd_to_prog('removeExtraSpaces'); 
+    }
+
+
+    removeExtraTabs() {
+        this.elt_file_src.value = removeRepeatedChar(this.elt_file_src.value, '\t');
+    }
+
+    evtsig_removeExtraTabs(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.removeExtraTabs();
+        this.add_cmd_to_prog('removeExtraTabs'); 
+    }
+
+
+    changeColumnToSemicolonFromComma() {
+        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ',', ';');
+    }
+
+    evtsig_changeColumnToSemicolonFromComma(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.changeColumnToSemicolonFromComma();
+        this.add_cmd_to_prog('changeColumnToSemicolonFromComma'); 
+    }
+
+
+    changeColumnToSemicolon() {
+        this.elt_file_src.value = changeColumn(this.elt_file_src.value, '\t', ';');
+    }
+
+    evtsig_changeColumnToSemicolon(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.changeColumnToSemicolon();
+        this.add_cmd_to_prog('changeColumnToSemicolon'); 
+    }
+
+
+    changeColumnToTab() {
+        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ';', '\t' );        
+    }
+
+    evtsig_changeColumnToTab(event, elt, details){
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.changeColumnToTab();
+        this.add_cmd_to_prog('changeColumnToTab'); 
+    }
+
+
+    changeCRinQuotes( newChar ) {
+        this.elt_file_src.value = changeCRinQuotes( this.elt_file_src.value, newChar);
+    }
+
+    evtsig_changeCRinQuotes( event, elt, details ) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        let newChar = this._getLSCookie('CRinQuotesChar');
+        // newChar = escapeBackslashChars(newChar); 
+        this.changeCRinQuotes( newChar );
+        this.add_cmd_to_prog('changeCRinQuotes', "'"+newChar+"'"); 
+    }
+
+
+    removeRowIfNoDate(colNum) {
+        if (typeof colNum == 'string')  colNum = parseInt(colNum, 10);
+        this.elt_file_src.value = removeRowIfNoDate(this.elt_file_src.value, colNum);
+    }
+
+    evtsig_removeRowIfNoDate(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        let colNum = this._getLSCookie('removeRowIfNoDate');
+        this.removeRowIfNoDate(colNum);
+        this.add_cmd_to_prog('removeRowIfNoDate', colNum); 
+    }
+
+
+
+    addRowAtTop(row) {
+        this.elt_file_src.value = row + '\\n' + this.elt_file_src.value;
+    }
+
+    evtsig_addRowAtTop(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        let row = this._getLSCookie('addRowAtTop');
+        this.addRowAtTop(row);
+        this.add_cmd_to_prog('addRowAtTop', row); 
+    }
+
+
+
+    dateToComptaDate() {
+        this.elt_file_src.value = dateToComptaDate(this.elt_file_src.value);
+    }
+
+    evtsig_dateToComptaDate(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.dateToComptaDate();
+        this.add_cmd_to_prog('dateToComptaDate'); 
+    }
+
+
+    removeMoneySign() {
+        this.elt_file_src.value = removeMoneySign( this.elt_file_src.value );
+    }
+
+    evtsig_removeMoneySign(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.removeMoneySign();
+        this.add_cmd_to_prog('removeMoneySign'); 
+    }
+
+
+    removeNoBreakSpaces() {
+        this.elt_file_src.value = removeNoBreakSpaces( this.elt_file_src.value );
+    }
+
+    evtsig_removeNoBreakSpaces(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.removeNoBreakSpaces();
+        this.add_cmd_to_prog('removeNoBreakSpaces'); 
+    }
+
+
+    removeQuotes() {
+        this.elt_file_src.value = removeQuotes( this.elt_file_src.value );
+    }
+
+    evtsig_removeQuotes(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.removeQuotes();
+        this.add_cmd_to_prog('removeQuotes'); 
+    }
+
+
+    changeDecimalSepFromPoint() {
+        this.elt_file_src.value = changeDecimalSepFromPoint( this.elt_file_src.value );
+    }
+
+    evtsig_changeDecimalSepFromPoint(event, elt, details){
+        this.hideMenu(event);        
+        this.undo.push( this.elt_file_src.value );
+        this.changeDecimalSepFromPoint();
+        this.add_cmd_to_prog('changeDecimalSepFromPoint'); 
+    }
+
+    run_cmd_with_params(cmd, params) {      // '1;2;6;8;10;19;15/\"([CD]) ([^\/]*)\/(.*)\"/;26;31')
+        if ( !method_exists(this, cmd) ) {
+            app.log('error : cmd '+cmd+' not found');
+            return;
+        }
+
+        params = params.split(',');
+
+        for (let i=0; i<params.length; i++) {
+            let p = params[i];
+            let res = p.replace(/^'([^']*)'\$/, '\$1');
+            params[i] = res;
+        }
+
+
+        this[cmd]( ...params );
+    }
+
+
+    add_cmd_to_prog(cmd, params){                     
+        if (cmd.startsWith('evtsig_')) cmd = cmd.substring(7);
+        if (this.elt_cmdlst_textarea.value) this.elt_cmdlst_textarea.value += "\\n";
+        if (params)
+            this.elt_cmdlst_textarea.value += cmd+'('+params+')';
+        else
+            this.elt_cmdlst_textarea.value += cmd+'()';
+    }
+
+
+    evtsig_prog_run() {       
+
+        DmcModal.show( "id_dlg_empty", 'Program is running...' ); 
+
+        this.undo.push( this.elt_file_src.value );
+        let t0 = Date.now(); 
+        let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+        let lines = method.split('\\n');
+        for (let row=0; row<lines.length; row++) {
+            if (lines[row] == '{{Compta') {
+                let progEtatPar = '';
+                for (let r=row+1; r<lines.length; r++) {
+                    if (lines[r] == '}}Compta') {
+                        this.etatParametrable(progEtatPar);
+                        row=r;
+                        break;
+                    }
+                    progEtatPar += lines[r] + '\\n';
+                }
+                continue;
+            }
+            // app.log('row '+row+' = '+lines[row]);
+            let regexp = /([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)/;
+            let m1 = lines[row].match(regexp);
+            if (m1 && m1.length==3) {
+                app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
+                this.run_cmd_with_params( m1[1], m1[2] );
+                app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
+            }
+        }
+
+        this._setLSCookie('file_src.value', this.elt_file_src.value);
+        DmcModal.hide();
+    }
+
+    etatParametrable(method) {  // evtsig_etatparametrable
+        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+
+        let acc = new DmcAccounting();
+        let dbEntries = acc.loadEntries( this.elt_file_src.value );
         let inner = acc.etatParametrable(dbEntries, method );
         let elt_file_dest = document.getElementById("id_file_dest"); 
         let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
@@ -391,8 +692,8 @@ Voici la liste des champs reconnus :
 
 
     event_file_src_onpaste(event) {
-        let pasteTxt = (event.clipboardData || window.clipboardData).getData('text');
-        app.log('event_file_src_onpaste len=' + pasteTxt.length );        
+        // let pasteTxt = (event.clipboardData || window.clipboardData).getData('text');
+        // app.log('event_file_src_onpaste len=' + pasteTxt.length );        
     }
 
     // event_file_src_onmouseup   id_cmdlst_textarea  event_cmdlst_textarea_onmouseup
@@ -422,14 +723,16 @@ Voici la liste des champs reconnus :
 
 
     async slot_dropfile( files ) {
+        this.elt_file_src.value = '';
+
         for (let i=0; i<files.length; i++) {
             let file_obj = files[i];
             if (file_obj === undefined || file_obj === null) continue;
             app.log( 'Trying to load file ['+ file_obj.name+']');
-            let upl_maxsize = 2048;  // Kb
-            if (file_obj.size > upl_maxsize*1024) {  // max 64Kb
-                let fs = file_obj.size/1024;
-                app.error( 'Error file size = '+ fs.toFixed(0) + 'Kb > '+ upl_maxsize.toFixed(0) +'Kb is too big...' );
+            let upl_maxsize = 10;  // let's say 10 Mb
+            if (file_obj.size > upl_maxsize*1024*1024) { 
+                let fs = file_obj.size/1024/1024;
+                app.error( 'Error file size = '+ fs.toFixed(0) + 'Mb > '+ upl_maxsize.toFixed(0) +'Mb is too big...' );
                 return;
             }
             let json = await DmcDropfile.post_file(file_obj);
@@ -441,8 +744,8 @@ Voici la liste des champs reconnus :
             let enc = find_encoding(txt);
             if (enc)  txt = binaryUtf8_toString(txt, enc);    
 
-            this.elt_file_src.value = txt; 
-            return;
+            if (i>0)  this.elt_file_src.value += '\\n'; 
+            this.elt_file_src.value += txt; 
         }
     }
 
@@ -494,12 +797,10 @@ Voici la liste des champs reconnus :
             link.innerHTML = icon_user +   escapeHtml( 'login' );
     }
 
+
     slot_event_logout( event, elt, details ) {  
         let link = document.getElementById("id_a_login");
-        let icon_user =  app.icon('icons/svg', 'user.svg');
-        link.innerHTML = icon_user + 'Login';
-
-        // app.error('logout !');
+        link.innerHTML = app.icon('icons/svg', 'user.svg') + 'Login';
     }
 
     slot_fill_contextmenu( event, elt, details ) {          // a Application.signal
@@ -752,7 +1053,7 @@ SOFTWARE.</pre>
                 let style='';
                 if (isNumeric(cols[col]))
                     style='style="text-align: right;"';
-                if (isDate(cols[col]))
+                if (isDate_slash(cols[col]))
                     style='style="text-align: center;"';
                 line += '<td '+style+'>' + cols[col] + '</td>';
             }
@@ -840,7 +1141,7 @@ SOFTWARE.</pre>
 
     async evtsig_empty( event ) {
         let v = await DmcModal.showAsync( "id_dlg_yes_no", 'Are you sure ?' );
-        app.log ( 'id_dlg_yes_no result = '+ v.result);
+        // app.log ( 'id_dlg_yes_no result = '+ v.result);
         if (v.result != 'SUBMIT') return;
         this.undo.push( this.elt_file_src.value );
         this.elt_file_src.focus();
@@ -859,139 +1160,6 @@ SOFTWARE.</pre>
         app.log('undo');
     }
 
-
-    evtsig_decodeFromISO_8859_15(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = from_ISO_8859_15( this.elt_file_src.value );
-        app.log('decode from ISO_8859_15');
-        this.hideMenu(event);
-    }
-
-    evtsig_changeColumnToSemicolonFromComma(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ',', ';');
-        app.log('change column [tab] to [;]');
-        this.hideMenu(event);
-    }
-
-    evtsig_changeColumnToSemicolon(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, '\t', ';');
-        app.log('change column [tab] to [;]');
-        this.hideMenu(event);
-    }
-
-    evtsig_changeColumnToTab(event, elt, details){
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ';', '\t' );        
-        app.log('change column [;] to [tab]');
-        this.hideMenu(event);
-    }
-
-    evtsig_changeCRinQuotes( event, elt, details ) {
-        let newChar = this._getLSCookie('CRinQuotesChar');  // '¶'
-        let cmd = details.slotName + "('"+escapeBackslashChars(newChar)+"')";
-        this.run_cmd(cmd); 
-
-        app.log("run "+cmd);
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = changeCRinQuotes( this.elt_file_src.value, newChar);
-        app.log('change CR in Quotes');
-        this.hideMenu(event);
-    }
-
-    /*
-
-    evtsig_keyOnMenuInput(event, elt, details) {
-        if (event.key === 'Enter' || event.keyCode === 13) {
-            app.log('evtsig_keyOnMenuInput '+event.type+' '+event.target.tagName);
-            let parentTd = event.target.parentElement.parentElement;
-            let firstChildSpan = parentTd.firstChild.firstChild;
-            event.preventDefault();
-            firstChildSpan.dispatchEvent( new Event("click") );
-            return false;
-        }
-    }
-    */
-
-
-    evtsig_reportCellIfNextIsEmpty(event, elt, details) {
-        let colNum = this._getLSCookie('reportCellIfNext');  // the column number
-        let cmd = details.slotName + "('"+colNum+"')";
-        this.run_cmd(cmd); 
-
-        this.undo.push( this.elt_file_src.value );
-        // let newOrder = order.split(';');
-        let lines = this.elt_file_src.value;
-        let txt  =  reportCellIfNoNext(lines, colNum);
-        this.elt_file_src.value = txt;
-
-        //app.log('change columns order');
-        this.hideMenu(event);        
-    }
-
-    evtsig_changeColumnsOrder(event, elt, details) {
-        let order = this._getLSCookie('columnsOrder');  // '¶'
-        let cmd = details.slotName + "('"+order+"')";
-        this.run_cmd(cmd); 
-
-        this.undo.push( this.elt_file_src.value );
-        let newOrder = order.split(';');
-        let lines = this.elt_file_src.value.split('\\n');
-        let txt='';
-        for (let row=0; row<lines.length; row++) {
-            txt += changeOrder( lines[row], newOrder ) + '\\n';
-        }
-        this.elt_file_src.value = txt;
-
-        //app.log('change columns order');
-        this.hideMenu(event);        
-    }
-
-    evtsig_removeExtraSpaces(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = removeRepeatedChar(this.elt_file_src.value, '\\u0020');
-        app.log('remove extra spaces');
-        this.hideMenu(event);
-    }
-
-    evtsig_removeExtraTabs(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = removeRepeatedChar(this.elt_file_src.value, '\t');
-        app.log('remove extra spaces');
-        this.hideMenu(event);
-    }
-
-    evtsig_removeMoneySign(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = removeMoneySign( this.elt_file_src.value );
-        app.log('remove money sign');
-        this.hideMenu(event);
-    }
-
-
-    evtsig_removeNoBreakSpaces(event, elt, details) {
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = removeNoBreakSpaces( this.elt_file_src.value );
-        app.log('remove no-break spaces');
-        this.hideMenu(event);
-    }
-
-    evtsig_changeDecimalSepFromPoint(event, elt, details){
-        this.run_cmd(details.slotName); 
-        this.undo.push( this.elt_file_src.value );
-        this.elt_file_src.value = changeDecimalSepFromPoint( this.elt_file_src.value );
-        app.log('change decimal separator [.] &gt; [,]');
-        this.hideMenu(event);        
-    }
 
     // ================ end of cmds ===============
     // ============================================
@@ -1154,42 +1322,65 @@ $html_menu = <<<EOLONGTEXT
         <div class="div_menu">
         <a signal="click››evtsig_decodeFromISO_8859_15" 
             statusmsg="if you have È instead of [é], Ù [ô], Ä [€], ∞ [°] ...">correct Mac Roman -  ISO_8859_15 errors</a>
-        <a signal="click››evtsig_changeColumnToSemicolonFromComma"
-            statusmsg="change column delimiter [,] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [,] =&gt; [;]</a>
-        <a signal="click››evtsig_changeColumnToSemicolon"
-            statusmsg="change column delimiter [tab] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [tab] =&gt; [;]</a>
-        <a signal="click››evtsig_changeColumnToTab"
-            statusmsg="change column delimiter [;] =&gt; [tab] (but not inside &quot;strings&quot;)">change column delimiter [;] =&gt; [tab]</a>
+
+        <ul><li><a>Remove extra : &vrtri;</a>
+            <div>
+            <a signal="click››evtsig_removeExtraSpaces"
+                    statusmsg="many spaces are changed in only one space (0x20)">remove extra spaces</a>
+            <a signal="click››evtsig_removeExtraTabs"
+                    statusmsg="many tabs are changed in only one tab (\\t) (0x09) char">remove extra tabs</a>
+            <a signal="click››evtsig_removeNoBreakSpaces"
+                    statusmsg="char 'no-break space' (&amp;nbsp;) (0xa0) are removed">remove no-break spaces</a>
+            <a signal="click››evtsig_removeQuotes"
+                    statusmsg="Quotes [&quot;] are removed, semicolons [;] &amp; quotes [&quot;] in quotes are changed into spec chars">remove quotes</a>
+            <a signal="click››evtsig_removeMoneySign"
+                    statusmsg="char '€£\$' are removed">remove money signs € £ \$</a>
+            <a signal="click››evtsig_dateToComptaDate"
+                    statusmsg="transform 25/12/2022 to 2022-12-25">date to comptaDate</a>
+            </div>
+        </li></ul>
+
+
+        <ul><li><a>Change column delimiter : &vrtri;</a>
+            <div>
+            <a signal="click››evtsig_changeColumnToSemicolonFromComma"
+                statusmsg="change column delimiter [,] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [,] =&gt; [;]</a>
+            <a signal="click››evtsig_changeColumnToSemicolon"
+                statusmsg="change column delimiter [tab] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [tab] =&gt; [;]</a>
+            <a signal="click››evtsig_changeColumnToTab"
+                statusmsg="change column delimiter [;] =&gt; [tab] (but not inside &quot;strings&quot;)">change column delimiter [;] =&gt; [tab]</a>
+            </div>
+        </li></ul>
+
+
         <form LSCookie="y"><table>
             <tr><td><label signal="click››evtsig_changeCRinQuotes" style="cursor:pointer;"
                 statusmsg="inside &quot;strings&quot; change char (LF) (\\n) (0x0a) to something else">change in quotes '\\n' to :</label></td>
                 <td><input type="text" LSCookie="CRinQuotesChar" style="width:2em;" /></td></tr>
         </table></form>
-
         <a signal="click››evtsig_changeDecimalSepFromPoint"
                 statusmsg="from 123.50 to 123,50 [.] =&gt; [,] (no change in quotes)">change decimal separator [.] =&gt; [,]</a>
-
         <form LSCookie="y"><table>
             <tr><td><label signal="click››evtsig_changeColumnsOrder" style="cursor:pointer;"
-                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7&gt;  or  1;15&sol;(D )(.*)&sol;">change columns order</label></td>
-                <td><input type="text" LSCookie="columnsOrder" style="width:5em;" /></td></tr>
+                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7&gt;if|3=Some|+4  or  1;15&sol;(D )(.*)&sol;">change columns order</label></td>
+                <td><input type="text" LSCookie="columnsOrder" style="width:8em;" /></td></tr>
         </table></form>
-
-
         <form LSCookie="y"><table>
             <tr><td><label signal="click››evtsig_reportCellIfNextIsEmpty" style="cursor:pointer;"
                 statusmsg="For column number : (columnNum)">report cell if next is empty</label></td>
-                <td><input type="text" LSCookie="reportCellIfNext" style="width:5em;" /></td></tr>
+                <td><input type="text" LSCookie="reportCellIfNext" style="width:3em;" /></td></tr>
+        </table></form>
+        <form LSCookie="y"><table>
+            <tr><td><label signal="click››evtsig_removeRowIfNoDate" style="cursor:pointer;"
+                statusmsg="For column number : (columnNum)">remove line if not date in column </label></td>
+                <td><input type="text" LSCookie="removeRowIfNoDate" style="width:3em;" /></td></tr>
+        </table></form>
+        <form LSCookie="y"><table>
+            <tr><td><label signal="click››evtsig_addRowAtTop" style="cursor:pointer;"
+                statusmsg="Add a row (on top position)">add this at the top of the text </label></td>
+                <td><input type="text" LSCookie="addRowAtTop" style="width:8em;" /></td></tr>
         </table></form>
 
-        <a signal="click››evtsig_removeExtraSpaces"
-                statusmsg="many spaces are changed in only one space (0x20)">remove extra spaces</a>
-        <a signal="click››evtsig_removeExtraTabs"
-                statusmsg="many tabs are changed in only one tab (\\t) (0x09) char">remove extra tabs</a>
-        <a signal="click››evtsig_removeNoBreakSpaces"
-                statusmsg="char 'no-break space' (&amp;nbsp;) (0xa0) are removed">remove no-break spaces</a>
-        <a signal="click››evtsig_removeMoneySign"
-                statusmsg="char '€£\$' are removed">remove money signs € £ \$</a>
         </div>
     </li>
 
@@ -1235,13 +1426,17 @@ $html_menu = <<<EOLONGTEXT
     </li>
 
     <li id="id_mnu_calcs"><a signal="click››evtsig_about">About</a>
+        <div class="div_menu">
+        <a signal="click››evtsig_prog_help">Aide compta</a>
+        </div>
     </li>
 
 </ul>
 
 
 <ul class="dmc_menu rounded_div">
-    <li id="id_mnu_login"><a id="id_a_login" onclick="WgtLogin.showDialog(this);">login</a>
+    <li id="id_mnu_login"><i id="id_php_connected" class="f7-icons" style="font-size:14px">link</i>
+        &nbsp; <a id="id_a_login" onclick="WgtLogin.showDialog(this);">login</a>
         <div class="div_menu">
         <a signal="click››evtsig_logout">Logout</a>
         </div>
@@ -1345,13 +1540,7 @@ function main() {
                  statusmsg="Run the program and show the result">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
-                <button type="button" class="program_edit" signal="click››evtsig_prog_help"
-                 statusmsg="Run some examples and informations about these programs.">
-                 <i class="f7-icons" >question_square_fill</i>
-                 </button>                    
                 </p>
-
-
                 <textarea id="id_cmdlst_textarea" class="program_edit"
                     onmouseup="app.event_cmdlst_textarea_onmouseup(event)"
                     oninput="app.event_cmdlst_textarea_oninput(event)">
