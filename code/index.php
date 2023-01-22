@@ -1678,11 +1678,11 @@ function main() {
                  <i class="f7-icons" >tray_arrow_down_fill</i>
                  </button>
                 <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog"
-                 statusmsg="Run the program and show the result, filter is possible (not finished)">
+                 statusmsg="Run the program and show the result">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
                 <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog_filter"
-                 statusmsg="Run the program and show the result">
+                 statusmsg="Run the program and show the result, filter is possible (not finished)">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
                 </p>
