@@ -44,13 +44,15 @@ include './src/div-contextmenu.mod.php';        // division module for context m
 include './src/div-dropfile.mod.php';           // division module for a div to drag-drop files
 include './src/div-icons-1.mod.php';            // division module : some embeded svg icons
 // include './src/div-toolbar.mod.php';             //
-include './src/div-accounting.mod.php';         // 
+include './src/div-accounting.mod.php';         // comptabilité
+include './src/div-tooltips.mod.php';           // tooltips
 
 // == 4 project modules ==
 include './src/prj-header-html.mod.php';                // prj header_html
 include './src/prj-utils-css.mod.php';                  // prj css_main
 include './src/prj-utils-css-icons.mod.php';            // prj icons 
 include './src/prj-wgtlistbox.mod.php';                 // Widget Listbox
+include './src/prj-wgttable.mod.php';                   // Widget Table
 include './src/prj-wgtlogin.mod.php';                   // Widget Login
 
 
@@ -158,6 +160,9 @@ button[type="button"].program_edit  i{
 a.help_link {
     text-decoration-style: dotted;
 }
+
+
+
 
 EOLONGTEXT );  // mod_css_index_php   
 CModules::include_end(__FILE__);
@@ -375,21 +380,6 @@ Voici la liste des champs reconnus :
 
     }
 
-
-    etatParametrable(method) {  
-        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
-
-        let acc = new DmcAccounting();
-        let dbEntries = acc.loadEntries( this.elt_file_src.value );
-        let inner = acc.etatParametrable(dbEntries, method );
-        let elt_file_dest = document.getElementById("id_file_dest"); 
-        let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
-        tbody.innerHTML = inner;
-        let thead_th = elt_file_dest.querySelector('thead th');
-        thead_th.innerText = 'Etat paramétrable';
-        DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
-
-    }
 
 
     reportCellIfNextIsEmpty(colNum) {
@@ -632,9 +622,54 @@ Voici la liste des champs reconnus :
     }
 
 
-    evtsig_prog_run() {       
 
-        DmcModal.show( "id_dlg_empty", 'Program is running...' ); 
+    evtsig_btn_run_prog_filter() {       
+
+        this.show_workingmsg( true );
+        // DmcModal.show( "id_dlg_empty", 'Program is running...' ); 
+        let needSave = false;
+
+        this.undo.push( this.elt_file_src.value );
+        let t0 = Date.now(); 
+        let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+        let lines = method.split('\\n');
+        for (let row=0; row<lines.length; row++) {
+            if (lines[row] == '{{Compta') {
+                let progEtatPar = '';
+                for (let r=row+1; r<lines.length; r++) {
+                    if (lines[r] == '}}Compta') {
+                        this.etatParametrableFilter(progEtatPar);
+                        row=r;
+                        break;
+                    }
+                    progEtatPar += lines[r] + '\\n';
+                }
+                continue;
+            }
+            // app.log('row '+row+' = '+lines[row]);
+            let regexp = /([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)/;
+            let m1 = lines[row].match(regexp);
+            if (m1 && m1.length==3) {
+                needSave = true;
+                app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
+                this.run_cmd_with_params( m1[1], m1[2] );
+                app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
+            }
+        }
+
+        if (needSave)
+            this._setLSCookie('file_src.value', this.elt_file_src.value);
+        // DmcModal.hide();
+        this.show_workingmsg( false );
+    }
+
+
+
+    evtsig_btn_run_prog() {       
+
+        this.show_workingmsg( true );
+        // DmcModal.show( "id_dlg_empty", 'Program is running...' ); 
+        let needSave = false;
 
         this.undo.push( this.elt_file_src.value );
         let t0 = Date.now(); 
@@ -657,15 +692,25 @@ Voici la liste des champs reconnus :
             let regexp = /([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)/;
             let m1 = lines[row].match(regexp);
             if (m1 && m1.length==3) {
+                needSave = true;
                 app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
                 this.run_cmd_with_params( m1[1], m1[2] );
                 app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
             }
         }
 
-        this._setLSCookie('file_src.value', this.elt_file_src.value);
-        DmcModal.hide();
+        if (needSave)
+            this._setLSCookie('file_src.value', this.elt_file_src.value);
+        // DmcModal.hide();
+        this.show_workingmsg( false );
     }
+
+    show_workingmsg( on ){
+        let elt_working  = document.getElementById( 'id_mnu_working' );
+        elt_working.style.display = on ? '' : 'none';
+    }
+
+
 
     etatParametrable(method) {  // evtsig_etatparametrable
         // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
@@ -681,6 +726,46 @@ Voici la liste des champs reconnus :
         DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
 
     }
+
+
+
+    etatParametrableFilter(method) {  // evtsig_etatparametrable
+        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+
+        let acc = new DmcAccounting();
+        let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        let inner = acc.etatParametrableFilter(dbEntries, method );
+        let elt_file_dest = document.getElementById("id_file_dest"); 
+        let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
+        tbody.innerHTML = inner;
+        let thead_th = elt_file_dest.querySelector('thead th');
+        thead_th.innerText = 'Etat paramétrable';
+        DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
+
+    }
+
+
+/*
+    etatParametrable(method) {  
+        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+
+        let acc = new DmcAccounting();
+        let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        let inner = acc.etatParametrable(dbEntries, method );
+        let elt_file_dest = document.getElementById("id_file_dest"); 
+        let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
+        tbody.innerHTML = inner;
+        let thead_th = elt_file_dest.querySelector('thead th');
+        thead_th.innerText = 'Etat paramétrable';
+        DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
+
+    }
+*/
+
+
+
+
+
 
     hideMenu(event) {
         DmcMenu.hideMenu(event.target);
@@ -723,16 +808,20 @@ Voici la liste des champs reconnus :
 
 
     async slot_dropfile( files ) {
+
+        this.show_workingmsg( true );
+
         this.elt_file_src.value = '';
 
         for (let i=0; i<files.length; i++) {
             let file_obj = files[i];
             if (file_obj === undefined || file_obj === null) continue;
             app.log( 'Trying to load file ['+ file_obj.name+']');
-            let upl_maxsize = 10;  // let's say 10 Mb
+            let upl_maxsize = 100;  // let's say 100 Mb
             if (file_obj.size > upl_maxsize*1024*1024) { 
                 let fs = file_obj.size/1024/1024;
                 app.error( 'Error file size = '+ fs.toFixed(0) + 'Mb > '+ upl_maxsize.toFixed(0) +'Mb is too big...' );
+                this.show_workingmsg( false );
                 return;
             }
             let json = await DmcDropfile.post_file(file_obj);
@@ -747,6 +836,7 @@ Voici la liste des champs reconnus :
             if (i>0)  this.elt_file_src.value += '\\n'; 
             this.elt_file_src.value += txt; 
         }
+        this.show_workingmsg( false );
     }
 
 
@@ -803,6 +893,11 @@ Voici la liste des champs reconnus :
         link.innerHTML = app.icon('icons/svg', 'user.svg') + 'Login';
     }
 
+
+    slot_progress(event, elt, details ) {          // a Application.signal
+        app.log('Application::slot_progress: txt='+details.txt);
+    }
+
     slot_fill_contextmenu( event, elt, details ) {          // a Application.signal
 
         /*  ----------------------------- 
@@ -840,7 +935,7 @@ Voici la liste des champs reconnus :
     }
 
 
-    evtsig_ctx_run(event, elt, details) {   // evtsig_prog_run  evtsig_ctx_run
+    evtsig_ctx_run(event, elt, details) {   
 
         let elt_list_fieldset = document.getElementById( 'id_lsbx_processes' );  
         let mnu_details = DmcContextmenu.getDetails();
@@ -862,7 +957,6 @@ Voici la liste des champs reconnus :
         thead_th.innerText = 'Etat paramétrable';
         DmcModal.show( "id_dlg_calcTable", 'calcTable' ); 
     }
-
 
 
 
@@ -910,6 +1004,32 @@ Voici la liste des champs reconnus :
         app.popup ( 'msg = \\n' + json.msg + '\\n' + '' );
     }
 
+
+
+    evtsig_test_worker() {
+        if (!this.worker1) {
+            this.worker1 = new Worker('src/worker1.js');
+            this.worker1.onmessage = function(e) {
+              console.log('Message reçu depuis le worker : '+e.data);
+            }
+        }
+
+        this.worker1.postMessage([15, 16]);
+        app.log('Message envoyé au worker');
+
+    }
+
+
+    evtsig_wgttable() {
+        let elt_wgttable = document.getElementById("id_wgt_table1");
+        WgtTable.resetData( elt_wgttable );
+        WgtTable.set_th ( elt_wgttable );
+        let txt = this.elt_file_src.value; 
+        WgtTable.importCsv ( elt_wgttable, txt );
+        WgtTable.connect_events_wdgt (elt_wgttable);  
+
+        DmcModal.show( "id_dlg_WgtTable", 'evtsig_wgttable' ); 
+    }
 
     evtsig_journal() {
         let journal = this._getLSCookie('Journal');
@@ -1002,6 +1122,7 @@ SOFTWARE.</pre>
     evtsig_grandJournal() {
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        acc.sort( dbEntries );
         let inner = acc.journal(dbEntries);
 
         let elt_file_dest = document.getElementById("id_file_dest"); 
@@ -1307,6 +1428,17 @@ $html_dialogs = <<<EOLONGTEXT
       </div>
     </dialog>
 
+
+    <dialog id="id_dlg_WgtTable" class="dmc_modal fade-in">
+      <div id="id_dlg_content" class="dm_modal_content">
+        <span class="btn_modal_close" data-modal="btn_close">&times;</span>
+        <table id="id_wgt_table1"  mwgtclass="WgtTable"  class="wgt_table" style="">
+        <thead></thead>
+        <tbody></tbody>
+        </table>
+      </div>
+    </dialog>
+
 </div> <!-- class="dm_modal_container" -->
 
 
@@ -1396,6 +1528,7 @@ $html_menu = <<<EOLONGTEXT
                 <a signal="click››evtsig_test1">test1 : DmcModal.show with a div</a>
                 <a signal="click››evtsig_test3_form">test3 : DmcModal.showAsync with form</a>
                 <a signal="click››evtsig_test5_post_test">test5 : post_test</a>
+                <a signal="click››evtsig_test_worker">test worker</a>
                 </div>
             </li>
         </ul>
@@ -1406,6 +1539,10 @@ $html_menu = <<<EOLONGTEXT
     </li>
 
     <li id="id_mnu_calcs"><a  signal="click››evtsig_calcTable">Table</a>
+        <div class="div_menu">
+        <a signal="click››evtsig_calcTable">Show table</a>
+        <a signal="click››evtsig_wgttable">Show table with search possibilities</a>
+        </div>
     </li>
 
     <li id="id_mnu_calcs"><a>Compta</a>
@@ -1425,10 +1562,14 @@ $html_menu = <<<EOLONGTEXT
         </div>
     </li>
 
-    <li id="id_mnu_calcs"><a signal="click››evtsig_about">About</a>
+    <li id="id_mnu_calcs"><a>?</a>
         <div class="div_menu">
+        <a signal="click››evtsig_about">About</a>
         <a signal="click››evtsig_prog_help">Aide compta</a>
         </div>
+    </li>
+
+    <li id="id_mnu_working" style="display: none;"><a>Working....</a>
     </li>
 
 </ul>
@@ -1536,7 +1677,11 @@ function main() {
                  statusmsg="Save this program.">
                  <i class="f7-icons" >tray_arrow_down_fill</i>
                  </button>
-                <button type="button" class="program_edit" signal="click››evtsig_prog_run"
+                <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog"
+                 statusmsg="Run the program and show the result, filter is possible (not finished)">
+                 <i class="f7-icons" >play_rectangle_fill</i>
+                 </button>
+                <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog_filter"
                  statusmsg="Run the program and show the result">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
@@ -1563,6 +1708,15 @@ function main() {
             <div class="dmc_respcard">
                 {{mod_html_div_dropfile}}
             </div>
+
+
+            <div id="id_card4" class="dmc_respcard">
+                <p class="tooltip" data-tooltip="Thanks for hovering! I'm a tooltip">test WgtTable</p>
+                <table id="id_wgt_table2"  mwgtclass="WgtTable" 
+                    class="wgt_table " style="">
+                </table>
+            </div>
+
           </div>
         </div>
         </div>
