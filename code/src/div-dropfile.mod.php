@@ -85,6 +85,9 @@ class DmcDropfile extends DmcBase {
                         return;
                     }
                     let txt = Math.round(percentComplete).toFixed(0)+'%';    // div.style.width = txt;
+                    let r = Application.signal( 'slot_progress', null, null, { txt:txt } );
+                    if (r === true) {
+                    }
                 }, 
                 
                 // ==== onload

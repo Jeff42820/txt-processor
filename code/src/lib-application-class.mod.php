@@ -86,6 +86,8 @@ CModules::append( 'mod_js_class_Application', <<<EOLONGTEXT
 class DmcBase {
 
     static registeredDmcClasses = {};
+    static idCount = 0;
+    static _elements =  {};
 
     constructor() {
         let cname = this.constructor.name;
@@ -106,11 +108,13 @@ class DmcBase {
         let s='List of registeredDmcClasses : '+'\\n';
         for (let className in DmcBase.registeredDmcClasses) {
             s += ' => '+className+'\\n';
+            /*
             let cl =  DmcBase.registeredDmcClasses[className].constructor;
             for (let eltId in cl.elts) {
                 let elt = cl.elts[eltId];
                 s += '    - <'+elt.tagName+' id="'+elt.id+'" class="'+elt.className+'">\\n';
             }
+            */
         }
         return s;
 
@@ -123,6 +127,11 @@ class DmcBase {
         }
     }
 
+    static createUniqueId() {
+        this.idCount++;
+        return 'id•'+this.idCount;
+    }
+
     static onload( parent ) {
         // console.log('in DmcBase.onload() for class='+this.name);
 
@@ -132,17 +141,32 @@ class DmcBase {
             let cl = DmcBase.registeredDmcClasses[className].constructor;
             let sel = cl.get_root_elt_selector();
             if (!sel) continue;
-            cl.elts = {};
-
+            
             let elts = parent.querySelectorAll( sel );
             for (let i=0; i < elts.length; i++) {
                 let elt = elts[i];
-                if (!elt.id)  elt.id = 'id_'+createUniqueId();
-                cl.elts[elt.id] = elt;
+                if (!elt.id)  elt.id = this.createUniqueId();
+                // cl.elts[elt.id] = elt;
+                this._elements[elt.id] = { elt:elt,  class: cl, data: {} };
             }
         }
 
     }
+
+
+    static resetData( elt ) {
+        let data = this.getData(elt);
+        if (!data) return;
+        data = {};
+    }
+
+    static getData( elt ) {
+        let _elt = this._elements[elt.id].elt; // = { elt:elt,  class: cl, data: {} };
+        if ( _elt !== elt ) return null;
+        let data = this._elements[elt.id].data;
+        return data;
+    }
+
 
     static connect_events( parent ) {
         // console.log('in DmcBase.connect_events() for class='+this.name);
@@ -158,7 +182,6 @@ class DmcBase {
         elt.addEventListener(eventName, function(e){return _class.signal(slotName, e, this, details);} );
     }
 
-
     static signal( slot, event, this_ev, details=undefined ) {
         if ( typeof this._inst[slot] != 'function' ) {
             app.log('DmcBase::signal error unknown method '+slot);
@@ -168,7 +191,7 @@ class DmcBase {
         return this._inst[slot]( event, this_ev, details );
     }
 
-    static get_all_elements() {
+    static get_all_elements__not_used() {
         let arr=[];
         for (let className in DmcBase.registeredDmcClasses) {
             let cl = DmcBase.registeredDmcClasses[className];
@@ -283,6 +306,7 @@ class Application {
         let _class = this;
         elt.addEventListener(eventName, function(e){return _class.signal(slotName, e, this, details);} );
     }
+
 
     static connect_signals( parent = undefined ) {
         if (parent == undefined)  parent = document.body;

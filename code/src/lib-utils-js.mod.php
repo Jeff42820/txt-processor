@@ -493,6 +493,11 @@ function changeOrder( line, newOrder ){
         }
         s += v+';';
     }
+
+    let lastIndex = s.lastIndexOf(';');
+    if (lastIndex == s.length-1) {
+        s = s.slice(0, -1); 
+    }
     return s;
 }
 
@@ -699,6 +704,20 @@ function calcRowHeight(textarea) {
 function str_taillines( str, n = 10) {
   if ( str_nblines(str) <= n )  return str;
   return str.split('\\n').slice(-n).join('\\n');  
+}
+
+
+function str_firstlines( str, n = 10) {
+
+    const regex = /[^\\n]*\\n/g;    //  RegExp('foo*', 'g');
+    let arr, res = '', i=0;
+
+    while ((arr = regex.exec(str)) !== null) {
+        res += arr[0];
+        i++;
+        if (i>=n) break;
+    }
+    return res;   //  str.split('\\n').slice(n).join('\\n');  
 }
 
 
