@@ -4,6 +4,36 @@
         // -------------------
 
 
+/*
+
+When file(s) are dropped into this div, the method [[ app.slot_dropfile(ev, files) ]]
+is sent.
+
+
+
+example 1 : 
+        echo $dm->sml_mustache( <<<EOLONGTEXT
+            <div class="dmc_respcard">
+                {{mod_html_div_dropfile}}
+            </div>
+        EOLONGTEXT, [ 'mod_html_div_dropfile' => $dm->mod_get_elt( 'div-dropfile.mod.php', 'mod_html_div_dropfile' )   ] );
+
+
+example 2 : 
+
+    <li id="id_mnu_file"><a>File</a>
+        <div class="div_menu">
+        <a onclick="DmcDropfile.ev_choosefile(event)">open 
+            <form class="form_dropfile_select">
+            <input type="file" id="DmcDropfile_selectfile" style="display:none;"/>
+            </form>
+        </a>
+        </div>
+    </li>
+
+*/
+
+
 CModules::include_begin(__FILE__, 'This is division module  dropfile');
 
 
@@ -16,15 +46,16 @@ CModules::append( 'mod_html_div_dropfile', <<<EOLONGTEXT
     ondragleave="DmcDropfile._this.ev_dragleave(event)">
     <p> &nbsp; </p>
     <p>
-    <span class="icon_inline"  onclick="DmcDropfile.ev_choosefile()" 
-        style="cursor:pointer;"><img class="icon_inline_scale1" src="icons/dropfile.svg" /> &nbsp; &nbsp; </span> &nbsp; 
+    <span class="icon_inline"  onclick="DmcDropfile.ev_choosefile(event)" style="cursor:pointer;">
+        <img class="icon_inline_scale1" src="icons/dropfile.svg" /> &nbsp; &nbsp; 
+    </span>
+        &nbsp; 
         Drag-drop your<br>file here
     </p>
-    <form class="div_dropfile_select">
-        <!-- input type="button" value="Select a file" onclick="DmcDropfile.ev_choosefile()" / -->
+    <p> &nbsp; </p>
+    <form class="form_dropfile_select"><!-- must be inside onclick="DmcDropfile.ev_choosefile elt, or inside div_dropfile -->
         <input type="file" id="DmcDropfile_selectfile" style="display:none;"/>
     </form>
-    <p> &nbsp; </p>
 </div>
 
 EOLONGTEXT );  // mod_html_div_dropfile
@@ -41,6 +72,10 @@ class DmcDropfile extends DmcBase {
     constructor() {
         super();
         this.constructor._this = this;      //        DmcDropfile._this = this;
+    }
+
+    static get_root_elt_selector() {
+        return  '.div_dropfile';
     }
 
     ev_dragleave(ev) {
@@ -60,19 +95,27 @@ class DmcDropfile extends DmcBase {
             app.error('Error : class ' + app.constructor.name + ' missing method [slot_dropfile]');
             return;
         }
-        app.slot_dropfile(ev.dataTransfer.files);
+        app.slot_dropfile(ev, ev.dataTransfer.files);
     }
 
     static ev_choosefile(ev) {
-        let input = document.getElementById('DmcDropfile_selectfile');
+        let form = ev.target.querySelector('form');    
+        if (!form) {
+            let wdgt  = ev.target.closest( DmcDropfile.get_root_elt_selector() );
+            if (wdgt)
+                form = wdgt.querySelector('form');
+            if (!form) 
+                return;
+        }
+        let input = form.querySelector('input[type="file"]');
         input.click();
-        input.onchange = function() {
-            DmcDropfile.upload_post_file( document.getElementById('DmcDropfile_selectfile').files );
+        input.onchange = function(ev) {
+            DmcDropfile.upload_post_file( ev );
         };
     }
 
-    static upload_post_file( files ){
-        app.slot_dropfile( files );
+    static upload_post_file( ev, files ){
+        app.slot_dropfile( ev, ev.target.files );
     }
 
     static async post_file(file_obj) {
@@ -108,6 +151,30 @@ class DmcDropfile extends DmcBase {
         else              ssize = (ssize / 1024).toFixed(0) + 'Mb';
         return ssize;
     }
+
+    static async convfile(file_obj) {
+        if (file_obj === undefined || file_obj === null) return '';
+        app.log( 'Trying to load file ['+ file_obj.name+']');
+        let upl_maxsize = 100;  // let's say 100 Mb
+        if (file_obj.size > upl_maxsize*1024*1024) { 
+            let fs = file_obj.size/1024/1024;
+            app.error( 'Error file size = '+ fs.toFixed(0) + 'Mb > '+ upl_maxsize.toFixed(0) +'Mb is too big...' );
+            return '';
+        }
+        let json = await DmcDropfile.post_file(file_obj);
+        if (json.error) {
+            app.error( json.msg );
+            return '';
+        }
+        else {
+            app.log( 'File ['+file_obj.name+'] loaded in '+json.delay+' size='+DmcDropfile.format_size(file_obj.size)+' ' );
+        }
+        let txt = atob( json['file'] );             //  atob  <=>   b64_to_utf8    <=>   binaryUtf8_toString
+        let enc = find_encoding(txt);
+        if (enc)  txt = binaryUtf8_toString(txt, enc);    
+        return txt;
+    }
+
 
 } // class DmcDropfile
 
@@ -198,8 +265,8 @@ CModules::append_onload( __FILE__, 'new DmcDropfile();' );
 
 CModules::append( 'mod_css_dmc_dropfile', <<<EOLONGTEXT
 
-div.drag_style_over {
-    border: #555 0.4em dashed !important;   
+.drag_style_over {
+    border: #555 0.2em dashed !important;   
 }
 
 div.div_dropfile {
@@ -207,14 +274,18 @@ div.div_dropfile {
   text-align:center;
   color: white;
   background-color: var(--main_color);   /*  #ff6b30;  */
-  border: #ddd 0.4em solid;   
+  border: #ddd 0.2em solid;   
   margin: 0.2em auto 0.2em auto;
   border-radius: 1em;
   /*  cursor: copy;  */
 }
 
 div.div_dropfile:hover {
-    border: #ddd 0.4em dashed;   
+    border: #ddd 0.2em dashed;   
+}
+
+form.form_dropfile_select {
+    display: none;
 }
 
 EOLONGTEXT );  // mod_css_dmc_dropfile   

@@ -23,7 +23,7 @@ CModules::append( 'mod_html_div_tooltips', <<<EOLONGTEXT
 <!--   mod_html_div_tooltips 
 
 example :                 
-    <p class="tooltip" data-tooltip="Thanks for hovering! I'm a tooltip">test WgtTable</p>
+    <p class="dmcss_tooltip" data-tooltip="Thanks for hovering! I'm a tooltip">test WgtTable</p>
 
 
 -->
@@ -55,7 +55,12 @@ CModules::append( 'mod_css_div_tooltips', <<<EOLONGTEXT
    ================================== */
 
 
-/*  ========= tooltip  ========== */
+/*  ========= dmcss_tooltip  ========== */
+
+:root{
+  --dmcss_tooltip_position_offset:   0.2em;
+}
+
 
 magic_opacity{
     animation-name: opacity_0_to_80;
@@ -67,59 +72,69 @@ magic_opacity{
     to   {opacity: 0.8;}
 }
 
-.tooltip {
+.dmcss_tooltip {
   position:relative; 
   border-bottom:1px dashed #000; 
 }
 
-.tooltip:before {
+.dmcss_tooltip:before {
   content: attr(data-tooltip); /* here's the magic */
   position:absolute;
+  display:none; 
 
   opacity: 0;
-  animation: 0.4s 1.5s opacity_0_to_80 forwards;     /* duration delay anim fill-mode */
+  animation: 0.4s 0s opacity_0_to_80 forwards;     /* duration delay anim fill-mode */
 
+    /* put that before the  [[top:100%;      left:50%;]]   specs      */
+    /* default  position : small offset  to right-bottom */
+  margin: 0;
 
   top:100%;    
   left:50%;         
-  transform:translateX(-30%); 
+  /* transform:translateX(-30%); */
 
-  margin-top:5px; /* and add a small left margin */
-  margin-left:5px; /* and add a small left margin */
   
-  width:200px;
-  padding:10px;
-  border-radius:10px;
+  min-width:   3em;
+  max-width:   10em;
+  width:       max-content;
+  padding:      1em;  /* space between border and content */
+  border: 1px solid darkgrey;
   background:#eee;
   color: #333;
-  text-align:center;
-
-  display:none; 
+  text-align: left;      // center;
 }
 
-.tooltip.left:before {
-  left:initial;         /* reset defaults */
-  margin:initial;
+.dmcss_tooltip.left_bottom:before {
+  left:   initial; 
+  right:  100%; 
+  /* transform:translateX(-30%); */
 
-  right:100%;           /* set new values */
-  margin-right:15px;
+  margin: initial;
+  margin-top: 0;
+  margin-left: 0;
+  margin-right:  0;
+  margin-bottom: 0;
 }
 
-.tooltip.right:before {
-  left:initial;         /* reset defaults */
-  margin:initial;
-
+.dmcss_tooltip.right_bottom:before {
+  right:initial;    
   left:100%;
-  margin-left:15px; /* and add a small left margin */
+  /* transform:translateX(-30%); */
+
+  margin:initial;
+  margin-top: 0;
+  margin-left: 0;
+  margin-right:  0;
+  margin-bottom: 0;
 }
 
-.tooltip:hover:before {
+.dmcss_tooltip:hover:before {
   display:block;
 }
 
 
 
-/*  ========= tooltip  ========== */
+/*  ========= dmcss_tooltip  ========== */
 
 
 

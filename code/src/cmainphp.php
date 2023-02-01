@@ -338,7 +338,14 @@ class CMainPhp {                    // base class for CPrjMain
 
         $time = time();
         $data['age']      = $time - $args[0]->wm_time;
-        $data['tic_age']  = $time - $_SESSION['wm_tic'];
+
+
+        // Undefined index: wm_tic 
+        if (in_array('wm_tic', $_SESSION )) {
+            $data['tic_age']  = $time - $_SESSION['wm_tic'];
+        } else {
+            $data['tic_age']  = 0;            
+        }
         if ($data['age']     > 12 * 60*60 ||        // 60sec * 60mn *12 = 12h
             $data['tic_age'] >      60*5      ) {   // 60sec * 5mn = 5mn
             $data['msg']  = "CMainPhp::post_check_watermark too old";
@@ -453,6 +460,21 @@ class CMainPhp {                    // base class for CPrjMain
         $data['msg']  = "\$_POST var = ".print_r( $_POST, true );
         
     }
+
+    function post_prepare_download( & $data, $args ) {
+
+        $filepath = 'rw/' . $this->session_hash . '.csv';
+
+        try {
+            file_put_contents($filepath, $args[0]);
+        } catch (Exception $e){
+            $data['error'] = 'CMainPhp::post_prepare_download error : Exception '.$e->getMessage();
+        }
+
+        $data['msg']  = "";
+
+    }
+
 
 }
 

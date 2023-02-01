@@ -11,7 +11,7 @@
   ====== 1) dmc_respcardcontainer & dmc_respcard
   ======    this is a responsive card system, using flex
   ====== 
-  ====== 2) dmc_flexvert 
+  ====== 2) dmc_flexvert (dmc_flexhori)
   ======    (and dmc_flexvert_child_fix dmc_flexvert_child_expand dmc_flexvert_child_separator )
   ======    this is a vertical positioning of divs
   ======    one has a fixed height, the others will expand to fill up the rest of the space
@@ -48,7 +48,7 @@ class DmcContainers extends DmcBase {
 
     constructor() {
         super();
-        this.constructor._this = this;      //        DmcContainers._this = this;
+        this.constructor._this = this;  
     }
 
     static onload( parent ){
@@ -59,9 +59,17 @@ class DmcContainers extends DmcBase {
     static connect_events( parent ) {
         super.connect_events( parent );
         if (!parent)  parent = document.body;
+
         let elts = parent.querySelectorAll('.dmc_flexvert');
         for (let i=0; i < elts.length; i++) {
             let sep = elts[i].querySelector('.dmc_flexvert_child_separator');            
+            if (sep) {            
+                if (!sep.onmousedown)  {  sep.onmousedown = DmcContainers_globalevents; }
+            }
+        }
+        elts = parent.querySelectorAll('.dmc_flexhori');
+        for (let i=0; i < elts.length; i++) {
+            let sep = elts[i].querySelector('.dmc_flexhori_child_separator');            
             if (sep) {            
                 if (!sep.onmousedown)  {  sep.onmousedown = DmcContainers_globalevents; }
             }
@@ -71,7 +79,8 @@ class DmcContainers extends DmcBase {
 
     static get_root_elt_selector() {
         return  'div.dmc_respcardcontainer, div.dmc_respcard, '+
-                '.dmc_flexvert, .dmc_flexvert_child_fix, .dmc_flexvert_child_expand';
+                '.dmc_flexvert, .dmc_flexvert_child_fix, .dmc_flexvert_child_expand' +
+                '.dmc_flexhori, .dmc_flexhori_child_fix, .dmc_flexhori_child_expand';
     }
 
 
@@ -79,8 +88,12 @@ class DmcContainers extends DmcBase {
 
         let m = {};
         m._elt = elt;
+        m._vertical = event.target.classList.contains('dmc_flexvert_child_separator');
         m._parent = elt.parentElement;
-        m._eltFix = elt.parentElement.querySelector('.dmc_flexvert_child_fix');
+        if (m._vertical)
+            m._eltFix = elt.parentElement.querySelector('.dmc_flexvert_child_fix');
+        else
+            m._eltFix = elt.parentElement.querySelector('.dmc_flexhori_child_fix');
         m._pt = { x: event.clientX, y: event.clientY };
 
         let eltHeight = pxToInt(m._eltFix.style.height);
@@ -93,7 +106,20 @@ class DmcContainers extends DmcBase {
                 eltHeight = clientRect.bottom - clientRect.top;
             }
         }
+
+        let eltWidth = pxToInt(m._eltFix.style.width);
+        if (eltWidth === undefined) {
+            let cs = getComputedStyle(m._eltFix);
+            eltWidth = pxToInt(cs.width);
+            // eltWidth = m._eltFix.offsetWidth - (pxToInt(cs.paddingLeft) + pxToInt(cs.paddingRight)); 
+            if (eltWidth === undefined) {
+                let clientRect = m._eltFix.getBoundingClientRect();
+                eltWidth = clientRect.right - clientRect.left;
+            }
+        }
+
         m._initialHeight = eltHeight;
+        m._initialWidth  = eltWidth;
 
         DmcContainers.moveWindow = m;
         // app.log('onmousedown_sep elt='+m._eltFix.id+', newHeight='+m._initialHeight);
@@ -110,19 +136,33 @@ class DmcContainers extends DmcBase {
         let m = DmcContainers.moveWindow;
         let pt = { x: m._pt.x - event.clientX, y: m._pt.y - event.clientY };
 
-        let newHeight = (m._initialHeight-pt.y) + 'px';
-        m._eltFix.style.height = newHeight;
+        let signal = {};
+        if (m._vertical) {
+            let newHeight = (m._initialHeight-pt.y) + 'px';
+            m._eltFix.style.height = newHeight;
+            signal = {
+                type:   'resize_mouseup',
+                value:   newHeight,
+                elt:     m._parent,
+                event:   event,
+                details: {},
+                target:  m._eltFix, 
+                sender:  m._elt
+            };
+        } else {
+            let newWidth = (m._initialWidth-pt.x) + 'px';
+            m._eltFix.style.width = newWidth;
+            signal = {
+                type:   'resize_mouseup',
+                value:   newWidth,
+                elt:     m._parent,
+                event:   event,
+                details: {},
+                target:  m._eltFix, 
+                sender:  m._elt
+            };
+        }
 
-
-        let signal = {
-            type:   'resize_mouseup',
-            value:   newHeight,
-            elt:     m._parent,
-            event:   event,
-            details: {},
-            target:  m._eltFix, 
-            sender:  m._elt
-        };
         Application.emit(  signal  );
 
         DmcContainers.moveWindow = null;   //     DmcModal
@@ -133,11 +173,17 @@ class DmcContainers extends DmcBase {
     static onmousemove_sep(elt, event) { 
         let m = DmcContainers.moveWindow;
         let pt = { x: m._pt.x - event.clientX, y: m._pt.y - event.clientY };
-        let newHeight = (m._initialHeight-pt.y) + 'px';
-        m._eltFix.style.height = newHeight;
+
+
+        if (m._vertical) {
+            let newHeight = (m._initialHeight-pt.y) + 'px';
+            m._eltFix.style.height = newHeight;
+        } else {
+            let newWidth = (m._initialWidth-pt.x) + 'px';
+            m._eltFix.style.width = newWidth;            
+        }
 
         DmcContainers.moveWindow = m;    //     DmcModal
-        // app.log('onmousemove_sep elt='+m._eltFix.id+', newHeight='+ newHeight );
         event.preventDefault();      
         return false;
     }
@@ -237,6 +283,39 @@ div.dmc_respcard {
     outline: 0;
     cursor: ns-resize;
 }
+
+
+/* ============== horizontal flex ============ */
+/* =========================== */
+/* =========================== */
+/* =========================== */
+/* =========================== */
+
+
+.dmc_flexhori {
+    display:flex; 
+    flex-direction:row; 
+
+}
+
+.dmc_flexhori_child_fix {
+    flex:none;
+}
+
+.dmc_flexhori_child_expand {
+    flex:1;
+}
+
+.dmc_flexhori_child_separator {
+    flex:none;
+    background-color: lightgray;
+    min-width: 7px;
+    border-radius: 2px;
+  /*  border: 2px outset gray;  */
+    outline: 0;
+    cursor: ew-resize;
+}
+
 
 
 EOLONGTEXT ); // mod_css_dmc_containers     

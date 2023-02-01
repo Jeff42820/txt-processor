@@ -92,21 +92,26 @@ class DmcMenu extends DmcBase {
     }
 
     static hideMenu( target ) {
-        let elt, hightDIV = undefined;
+        let elt, hightDIV;
+        hightDIV = target.closest('div.div_menu');
+
+        /*
         for (elt=target; elt && !elt.classList.contains('dmc_menu'); elt=elt.parentElement ) {
             let tag = elt.tagName;
             if (elt.tagName == 'DIV')
                 hightDIV = elt;
-        }
+        } 
+        */
+
         if (hightDIV) {
-            hightDIV.style.visibility = 'hidden';   // only for 100ms !  ;-)
+            hightDIV.style.visibility = 'hidden';   // only for 200ms !  ;-)
             setTimeout(function(){
                     if (hightDIV) {
                         hightDIV.style.visibility = '';
                         hightDIV = null;
                     }                
                 }
-                , 100); 
+                , 200); 
         }
 
     }

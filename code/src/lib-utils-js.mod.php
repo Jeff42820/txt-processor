@@ -208,7 +208,7 @@ function changeColumn(txt, column='\t', newColumn=';') {
 }
 
 
-function removeQuotes(txt) {
+function removeQuotes1(txt) {
     // inQuotes     ‖  ⁏ 
     const newSemicolon = '‚';       // '⁏⁝'
     const newQuote     = '‖';       // '⁏'    
@@ -228,6 +228,19 @@ function removeQuotes(txt) {
 
     return _foreachLine( txt, ';', ';', changeCell );
 
+}
+
+
+function removeQuotes2(s, quote='"') {  
+    const newQuote     = '‖';  
+    const MAP = {  quote: newQuote  };
+    const reg =  new RegExp('['+quote+']', "g");
+    if (s.length<2) return s;
+    if (s[0]!=quote || s[s.length-1]!=quote) return s;
+    let     ss = s.slice(1, s.length-1);
+    ss = ss.replace( quote+quote, newQuote );
+    ss = ss.replace(reg, function (c) {  return MAP[c];  });
+    return ss;
 }
 
 
@@ -292,8 +305,8 @@ function removeRowIfNoDate(txt, colNumber){
         if (ss.length>=2 && ss[0]=='"' && ss[s.length-1]=='"') 
             ss = ss.slice(1, ss.length-1);
 
-        let start = ss.toLowerCase().slice(0,3);
-        if (start == 'dat') return s;
+        //let start = ss.toLowerCase().slice(0,3);
+        //if (start == 'dat') return s;
 
         if (!_isDate(ss))
             return null;
@@ -557,6 +570,17 @@ function setCharAt(str,index,chr) {
 
 function removeNoBreakSpaces(s) {    
     return s.replaceAll('\xc2\xa0', '');    
+}
+
+
+function array_splice ( arr, array_of_indexes, subarr=undefined ) {
+    if (array_of_indexes.length == 0) return;
+    array_of_indexes.sort();
+    for (let i=array_of_indexes.length-1; i>=0; i--) {
+        let index = array_of_indexes[i];
+        if (subarr !== undefined) subarr.push( arr[index] );
+        arr.splice(index, 1);
+    }
 }
 
 function removeMoneySign(s) {
