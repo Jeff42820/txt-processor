@@ -70,7 +70,7 @@ CModules::append( 'mod_css_index_php', <<<EOLONGTEXT
   --main_color_hover:  #e2282b;
 }
 
-textarea.txt_file_src  {
+textarea.std_textarea  {
     display: block;
     /* width: 100%;  */
 
@@ -135,7 +135,11 @@ textarea.program_edit {
     min-width: 22em;
     min-height: 5em;
     background-color: #ecf;
-    max-width: calc(100% - 6px);  
+    width: calc(100% - 1.5em);
+    resize: vertical;  
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+    margin: 0.1em;
 }
 
 input[type="text"].program_edit  {
@@ -146,6 +150,7 @@ button[type="button"].program_edit {
     background-color: var(--main_color);
     padding:  0.5em;
     border-radius: 1em;
+    border: 0;
 }
 
 button[type="button"].program_edit  i{
@@ -161,6 +166,42 @@ a.help_link {
     text-decoration-style: dotted;
 }
 
+div.dlg_bnk_btns button[type="button"] {
+    color: #eee;
+    background-color: var(--main_color);  
+    padding:  0.5em;
+    margin:  0.5em;
+    border-radius: 1em;
+}
+
+div.dlg_bnk_dwnld {
+    color: #eee;
+    background-color: var(--main_color);  
+    padding:  0.5em;
+    margin:  0.5em;
+    border-radius: 1em;    
+}
+
+
+div.dlg_bnk_dwnld a,            div.dlg_bnk_dwnld a:link, 
+div.dlg_bnk_dwnld a:visited,    div.dlg_bnk_dwnld a:active {
+  /*  border: solid 1px #eee;   */
+    color: #eee;
+    border-radius: 0.4em;
+    margin: 0.4em;
+    padding: 0.2em;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+div.dlg_bnk_dwnld a:hover {
+
+    background-color: var(--main_color_hover);  
+
+ /*   background-color: #fff3;  */
+    text-decoration: underline;
+  /*  border: solid 1px #eee8;  */
+}
 
 
 
@@ -191,6 +232,7 @@ class ApplicationTest extends Application {
         'file_src.value' :      'Please paste some text here',
         'lst_textarea.value' :  '',
         'elt_file_src.height' : '300px',
+        'elt_prog_list.width' : '150px',
         'test1' :               'default value',
         'columnsOrder' :        '1;2;3;4;5;6;7;8;9;10',
         'reportCellIfNext' :    '1',
@@ -224,7 +266,6 @@ class ApplicationTest extends Application {
 
         // heart beat is ok : 
         let elt_php_connected = document.getElementById("id_php_connected");
-
         elt_php_connected.style.color = icon ? 'black' : 'white';
 
         // signal a slow communication :
@@ -261,6 +302,15 @@ class ApplicationTest extends Application {
         super.onload_after_modules();
         this.elt_file_src  = document.getElementById("id_file_src");
         this.elt_cmdlst_textarea = document.getElementById("id_cmdlst_textarea");
+        this.elt_prog_list = document.getElementById('id_prog_list'); 
+
+
+        // add drop capabilities to elt_cmdlst_textarea
+        this.elt_file_src.ondrop =       DmcDropfile._this.ev_dropfile;
+        this.elt_file_src.ondragover =   DmcDropfile._this.ev_dragover; 
+        this.elt_file_src.ondragleave =  DmcDropfile._this.ev_dragleave;        
+
+
 
         // this.set_p_value( 'id_js_symbols', escapeHtml('Symbols=')+this.symbols()+"<br>\\n" );
         // calcRowHeight(this.elt_file_src);        // calc real rowHeight and store it into elt.rowHeight 
@@ -270,11 +320,14 @@ class ApplicationTest extends Application {
         let h = this._getLSCookie('elt_file_src.height');
         if (h != null) this.elt_file_src.style.height = h;
 
+        h = this._getLSCookie('elt_prog_list.width');
+        if (h != null) this.elt_prog_list.style.width = h;
+
         h = this._getLSCookie('file_src.value');
         if (h != null) this.elt_file_src.value = h;
         
-        h = this._getLSCookie('elt_cmdlst_textarea.width');
-        if (h != null) this.elt_cmdlst_textarea.style.width = h;
+        /*  h = this._getLSCookie('elt_cmdlst_textarea.width');
+            if (h != null) this.elt_cmdlst_textarea.style.width = h;  */
 
         h = this._getLSCookie('elt_cmdlst_textarea.height');
         if (h != null) this.elt_cmdlst_textarea.style.height = h;
@@ -288,6 +341,7 @@ class ApplicationTest extends Application {
         this._connectLSCookies();
 
     } // onload_after_modules
+
 
 
     // =======================================
@@ -382,220 +436,216 @@ Voici la liste des champs reconnus :
 
 
 
-    reportCellIfNextIsEmpty(colNum) {
-        if (typeof colNum == 'string')
-            colNum = parseInt( colNum, 10 );
-        let txt  =  reportCellIfNoNext(this.elt_file_src.value, colNum);
-        this.elt_file_src.value = txt;
+
+
+    pcmd_decodeFromISO_8859_15( src ) {
+        return from_ISO_8859_15( src );  
     }
 
-    evtsig_reportCellIfNextIsEmpty(event, elt, details) {
-        this.hideMenu(event); 
-        this.undo.push( this.elt_file_src.value );
-
-        let colNum = this._getLSCookie('reportCellIfNext');
-        this.reportCellIfNextIsEmpty(colNum);
-        this.add_cmd_to_prog('reportCellIfNextIsEmpty', ''+colNum );
-
+    pcmd_removeExtraSpaces( src ) {
+        return trimEachCell( removeRepeatedChar( src, '\\u0020') );
     }
 
+    pcmd_removeExtraTabs( src ) {
+        return removeRepeatedChar( src, '\t');
+    }
 
-    changeColumnsOrder( order ) {
+    pcmd_removeNoBreakSpaces( src ) {
+        return removeNoBreakSpaces( src );
+    }
+
+    pcmd_removeQuotes( src ) {
+        return removeQuotes1( src );
+    }
+
+    pcmd_removeMoneySign( src ) {
+        return removeMoneySign( src );
+    }
+
+    pcmd_dateToComptaDate( src ) {
+        return dateToComptaDate( src );
+    }
+
+    pcmd_changeCRinQuotes( src, newChar ) {
+        return changeCRinQuotes( src, newChar );
+    }
+
+    pcmd_changeColumnToSemicolonFromComma( src ) {
+        return changeColumn(src, ',', ';');
+    }
+
+    pcmd_changeColumnTabToSemicolon( src ) {
+        return changeColumn(src, '\t', ';');
+    }
+
+    pcmd_changeDelimiterSemicolumnToTab( src ) {
+        return changeColumn(src, ';', '\t' );        
+    }
+
+    pcmd_changeDecimalSepFromPoint( src ) {
+        return changeDecimalSepFromPoint( src );
+    }
+
+    pcmd_changeColumnsOrder( src, order ) {
         let newOrder = order.split(';');
-        let lines = this.elt_file_src.value.split('\\n');
-        let txt='';
+        let txt='', lines = src.split('\\n');
         for (let row=0; row<lines.length; row++) {
             txt += changeOrder( lines[row], newOrder ) + '\\n';
         }
-        this.elt_file_src.value = txt;
+        return txt;
     }
 
-    evtsig_changeColumnsOrder(event, elt, details) {
-        this.hideMenu(event);        
-        this.undo.push( this.elt_file_src.value );
-        let order = this._getLSCookie('columnsOrder');  // '¶'
-        this.changeColumnsOrder( order );
-        this.add_cmd_to_prog('changeColumnsOrder', "'"+order+"'"); 
+    pcmd_reportCellIfNextIsEmpty( src, colNum ) {
+        if (typeof colNum == 'string')  colNum = parseInt( colNum, 10 );
+        return reportCellIfNoNext(this.elt_file_src.value, colNum);
     }
 
-
-    decodeFromISO_8859_15() {
-        this.elt_file_src.value = from_ISO_8859_15( this.elt_file_src.value );
+    pcmd_removeRowIfNoDate( src, colNum ) {
+        if (typeof colNum == 'string')  colNum = parseInt(colNum, 10);
+        return removeRowIfNoDate( src, colNum );
     }
 
-    evtsig_decodeFromISO_8859_15(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.decodeFromISO_8859_15();
-        this.add_cmd_to_prog('decodeFromISO_8859_15'); 
+    pcmd_addRowAtTop( src, row ) {
+        return row + '\\n' + src;
     }
 
 
-    removeExtraSpaces() {
-        this.elt_file_src.value = trimEachCell( removeRepeatedChar(this.elt_file_src.value, '\\u0020') );
-    }
 
-    evtsig_removeExtraSpaces(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.removeExtraSpaces();
-        this.add_cmd_to_prog('removeExtraSpaces'); 
-    }
-
-
-    removeExtraTabs() {
-        this.elt_file_src.value = removeRepeatedChar(this.elt_file_src.value, '\t');
-    }
-
-    evtsig_removeExtraTabs(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.removeExtraTabs();
-        this.add_cmd_to_prog('removeExtraTabs'); 
-    }
-
-
-    changeColumnToSemicolonFromComma() {
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ',', ';');
-    }
-
-    evtsig_changeColumnToSemicolonFromComma(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.changeColumnToSemicolonFromComma();
-        this.add_cmd_to_prog('changeColumnToSemicolonFromComma'); 
-    }
-
-
-    changeColumnToSemicolon() {
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, '\t', ';');
-    }
-
-    evtsig_changeColumnToSemicolon(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.changeColumnToSemicolon();
-        this.add_cmd_to_prog('changeColumnToSemicolon'); 
-    }
-
-
-    changeColumnToTab() {
-        this.elt_file_src.value = changeColumn(this.elt_file_src.value, ';', '\t' );        
-    }
-
-    evtsig_changeColumnToTab(event, elt, details){
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.changeColumnToTab();
-        this.add_cmd_to_prog('changeColumnToTab'); 
-    }
-
-
-    changeCRinQuotes( newChar ) {
-        this.elt_file_src.value = changeCRinQuotes( this.elt_file_src.value, newChar);
-    }
 
     evtsig_changeCRinQuotes( event, elt, details ) {
         this.hideMenu(event);
         this.undo.push( this.elt_file_src.value );
         let newChar = this._getLSCookie('CRinQuotesChar');
         // newChar = escapeBackslashChars(newChar); 
-        this.changeCRinQuotes( newChar );
-        this.add_cmd_to_prog('changeCRinQuotes', "'"+newChar+"'"); 
+        this.elt_file_src.value = this.pcmd_changeCRinQuotes( this.elt_file_src.value, newChar );
+        // this.add_cmd_to_prog('changeCRinQuotes', "'"+newChar+"'"); 
     }
 
+    evtsig_decodeFromISO_8859_15(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = this.pcmd_decodeFromISO_8859_15( this.elt_file_src.value );
+        // this.add_cmd_to_prog('decodeFromISO_8859_15'); 
+    }
 
-    removeRowIfNoDate(colNum) {
-        if (typeof colNum == 'string')  colNum = parseInt(colNum, 10);
-        this.elt_file_src.value = removeRowIfNoDate(this.elt_file_src.value, colNum);
+    evtsig_removeExtraSpaces(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = this.pcmd_removeExtraSpaces( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('removeExtraSpaces'); 
+    }
+
+    evtsig_removeExtraTabs(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = this.pcmd_removeExtraTabs( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('removeExtraTabs'); 
+    }
+
+    evtsig_removeNoBreakSpaces(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_removeNoBreakSpaces( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('removeNoBreakSpaces'); 
+    }
+
+    evtsig_removeQuotes(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_removeQuotes( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('removeQuotes'); 
+    }
+
+    evtsig_removeMoneySign(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_removeMoneySign( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('removeMoneySign'); 
+    }
+
+    evtsig_dateToComptaDate(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_dateToComptaDate( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('dateToComptaDate'); 
+    }
+
+    evtsig_changeColumnToSemicolonFromComma(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_changeColumnToSemicolonFromComma( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('changeColumnToSemicolonFromComma'); 
+    }
+
+    evtsig_changeColumnTabToSemicolon(event, elt, details) {
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_changeColumnTabToSemicolon( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('changeColumnTabToSemicolon'); 
+    }
+
+    evtsig_changeDelimiterSemicolumnToTab(event, elt, details){
+        this.hideMenu(event);
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_changeDelimiterSemicolumnToTab( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('changeDelimiterSemicolumnToTab'); 
+    }
+
+    evtsig_changeDecimalSepFromPoint(event, elt, details){
+        this.hideMenu(event);        
+        this.undo.push( this.elt_file_src.value );
+        this.elt_file_src.value = 
+            this.pcmd_changeDecimalSepFromPoint( this.elt_file_src.value  );        
+        // this.add_cmd_to_prog('changeDecimalSepFromPoint'); 
+    }
+
+    evtsig_changeColumnsOrder(event, elt, details) {
+        this.hideMenu(event);        
+        this.undo.push( this.elt_file_src.value );
+        let order = this._getLSCookie('columnsOrder');  // '¶'
+        this.elt_file_src.value = this.pcmd_changeColumnsOrder( this.elt_file_src.value, order );
+        // this.add_cmd_to_prog('changeColumnsOrder', "'"+order+"'"); 
+    }
+
+    evtsig_reportCellIfNextIsEmpty(event, elt, details) {
+        this.hideMenu(event); 
+        this.undo.push( this.elt_file_src.value );
+        let colNum = this._getLSCookie('reportCellIfNext');
+        this.elt_file_src.value = this.pcmd_reportCellIfNextIsEmpty( this.elt_file_src.value, colNum );
+        // this.add_cmd_to_prog('reportCellIfNextIsEmpty', ''+colNum );
     }
 
     evtsig_removeRowIfNoDate(event, elt, details) {
         this.hideMenu(event);
         this.undo.push( this.elt_file_src.value );
         let colNum = this._getLSCookie('removeRowIfNoDate');
-        this.removeRowIfNoDate(colNum);
-        this.add_cmd_to_prog('removeRowIfNoDate', colNum); 
-    }
-
-
-
-    addRowAtTop(row) {
-        this.elt_file_src.value = row + '\\n' + this.elt_file_src.value;
+        this.elt_file_src.value = this.pcmd_removeRowIfNoDate( this.elt_file_src.value, colNum );
+        // this.add_cmd_to_prog('removeRowIfNoDate', colNum); 
     }
 
     evtsig_addRowAtTop(event, elt, details) {
         this.hideMenu(event);
         this.undo.push( this.elt_file_src.value );
         let row = this._getLSCookie('addRowAtTop');
-        this.addRowAtTop(row);
-        this.add_cmd_to_prog('addRowAtTop', row); 
+        this.elt_file_src.value = this.pcmd_addRowAtTop( this.elt_file_src.value, colNum );
+        // this.add_cmd_to_prog('addRowAtTop', row); 
     }
 
 
 
-    dateToComptaDate() {
-        this.elt_file_src.value = dateToComptaDate(this.elt_file_src.value);
-    }
-
-    evtsig_dateToComptaDate(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.dateToComptaDate();
-        this.add_cmd_to_prog('dateToComptaDate'); 
-    }
 
 
-    removeMoneySign() {
-        this.elt_file_src.value = removeMoneySign( this.elt_file_src.value );
-    }
+    run_cmd_with_params(cmd, intxt, params) {      // '1;2;6;8;10;19;15/\"([CD]) ([^\/]*)\/(.*)\"/;26;31')
 
-    evtsig_removeMoneySign(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.removeMoneySign();
-        this.add_cmd_to_prog('removeMoneySign'); 
-    }
-
-
-    removeNoBreakSpaces() {
-        this.elt_file_src.value = removeNoBreakSpaces( this.elt_file_src.value );
-    }
-
-    evtsig_removeNoBreakSpaces(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.removeNoBreakSpaces();
-        this.add_cmd_to_prog('removeNoBreakSpaces'); 
-    }
-
-
-    removeQuotes() {
-        this.elt_file_src.value = removeQuotes( this.elt_file_src.value );
-    }
-
-    evtsig_removeQuotes(event, elt, details) {
-        this.hideMenu(event);
-        this.undo.push( this.elt_file_src.value );
-        this.removeQuotes();
-        this.add_cmd_to_prog('removeQuotes'); 
-    }
-
-
-    changeDecimalSepFromPoint() {
-        this.elt_file_src.value = changeDecimalSepFromPoint( this.elt_file_src.value );
-    }
-
-    evtsig_changeDecimalSepFromPoint(event, elt, details){
-        this.hideMenu(event);        
-        this.undo.push( this.elt_file_src.value );
-        this.changeDecimalSepFromPoint();
-        this.add_cmd_to_prog('changeDecimalSepFromPoint'); 
-    }
-
-    run_cmd_with_params(cmd, params) {      // '1;2;6;8;10;19;15/\"([CD]) ([^\/]*)\/(.*)\"/;26;31')
-        if ( !method_exists(this, cmd) ) {
-            app.log('error : cmd '+cmd+' not found');
+        if ( !method_exists(this, 'pcmd_'+cmd) ) {
+            app.error('error : cmd '+'pcmd_'+cmd+' not found');
             return;
         }
 
@@ -607,8 +657,7 @@ Voici la liste des champs reconnus :
             params[i] = res;
         }
 
-
-        this[cmd]( ...params );
+        return this['pcmd_'+cmd]( intxt, ...params );
     }
 
 
@@ -652,7 +701,7 @@ Voici la liste des champs reconnus :
             if (m1 && m1.length==3) {
                 needSave = true;
                 app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
-                this.run_cmd_with_params( m1[1], m1[2] );
+                this.run_cmd_with_params( m1[1], null, m1[2] );
                 app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
             }
         }
@@ -663,17 +712,51 @@ Voici la liste des champs reconnus :
         this.show_workingmsg( false );
     }
 
+    run_prog(method, intxt) {
 
+        let outtxt = null;
+        let needSave = false;
+        let t0 = Date.now(); 
+        let lines = method.split('\\n');
+        for (let row=0; row<lines.length; row++) {
+            if (lines[row] == '{{Compta') {
+                let progEtatPar = '';
+                for (let r=row+1; r<lines.length; r++) {
+                    if (lines[r] == '}}Compta') {
+                        this.etatParametrable(progEtatPar);
+                        row=r;
+                        break;
+                    }
+                    progEtatPar += lines[r] + '\\n';
+                }
+                continue;
+            }
+            // app.log('row '+row+' = '+lines[row]);
+            let regexp = /([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)/;
+            let m1 = lines[row].match(regexp);
+            if (m1 && m1.length==3) {
+                // needSave = true;
+                app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
+                let res = this.run_cmd_with_params( m1[1], intxt, m1[2] );
+                if (res) {
+                    outtxt = res;
+                    intxt = res;
+                }
+                app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
+            }
+        }
+        return outtxt;
+
+    }
 
     evtsig_btn_run_prog() {       
 
         this.show_workingmsg( true );
         // DmcModal.show( "id_dlg_empty", 'Program is running...' ); 
-        let needSave = false;
-
         this.undo.push( this.elt_file_src.value );
-        let t0 = Date.now(); 
         let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
+
+        /* let needSave = false;
         let lines = method.split('\\n');
         for (let row=0; row<lines.length; row++) {
             if (lines[row] == '{{Compta') {
@@ -694,13 +777,17 @@ Voici la liste des champs reconnus :
             if (m1 && m1.length==3) {
                 needSave = true;
                 app.log( 't='+(Date.now() - t0)+'ms, start cmd='+m1[1] );
-                this.run_cmd_with_params( m1[1], m1[2] );
+                this.run_cmd_with_params( m1[1], null, m1[2] );
                 app.log( 't='+(Date.now() - t0)+'ms, end cmd='+m1[1] );
             }
         }
+        */
 
-        if (needSave)
+        let outtxt = this.run_prog( method, this.elt_file_src.value );
+        if (outtxt != null)  {
+            this.elt_file_src.value = outtxt;
             this._setLSCookie('file_src.value', this.elt_file_src.value);
+        }
         // DmcModal.hide();
         this.show_workingmsg( false );
     }
@@ -713,7 +800,6 @@ Voici la liste des champs reconnus :
 
 
     etatParametrable(method) {  // evtsig_etatparametrable
-        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
 
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
@@ -730,7 +816,6 @@ Voici la liste des champs reconnus :
 
 
     etatParametrableFilter(method) {  // evtsig_etatparametrable
-        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
 
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
@@ -747,7 +832,6 @@ Voici la liste des champs reconnus :
 
 /*
     etatParametrable(method) {  
-        // let method  = document.getElementById( 'id_cmdlst_textarea' ).value;
 
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
@@ -807,7 +891,17 @@ Voici la liste des champs reconnus :
     }
 
 
-    async slot_dropfile( files ) {
+
+    async slot_dropfile( ev, files ) {
+
+        if (ev) {
+            let wgt = ev.currentTarget.closest( DmcDropfile.get_root_elt_selector() );
+            let modal = ev.currentTarget.closest( DmcModal.get_root_elt_selector() );
+            if (modal && modal.id == 'id_dlg_bnks') {
+                this.slot_dropfile_bnk_cagr( ev, files, modal );
+                return;
+            }
+        }
 
         this.show_workingmsg( true );
 
@@ -842,9 +936,21 @@ Voici la liste des champs reconnus :
 
     msig_flexvert_resize( signal ) {         // a msignal
 
-        let h = this.elt_file_src.style.height;   
+        // let h = this.elt_file_src.style.height;   
+        let h = signal.target.style.height;   
         if (!h || h=='')  h = signal.value;
         this._setLSCookie('elt_file_src.height', h); 
+
+    }
+
+
+    msig_flexhori_resize( signal ) {  
+
+        // let elt = document.getElementById('id_prog_list');  //  the dmc_flexhori_child_fix div is resized
+        let elt = signal.target;
+        let w = elt.style.width;   
+        if (!w || w=='')  w = signal.value;
+        this._setLSCookie('elt_prog_list.width', w); 
 
     }
 
@@ -948,6 +1054,10 @@ Voici la liste des champs reconnus :
 
         let acc = new DmcAccounting();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
+        if (!dbEntries) {
+            app.log('Error loadEntries');
+            return;
+        }
         let inner = acc.etatParametrable(dbEntries, program_src );
 
         let elt_file_dest = document.getElementById("id_file_dest"); 
@@ -998,6 +1108,119 @@ Voici la liste des champs reconnus :
         }
     }
 
+// ===================================
+// ===================================
+
+
+
+    async evtsig_bnk_convert() {
+        this.reset_dlg_bnks();   
+        let v = await DmcModal.showAsync( "id_dlg_bnks", '' );
+        if (v && v.data) {
+            app.log('evtsig_bnk_convert with result='+v.result);
+            app.log('  data='+ JSON.stringify(v.data) );
+        } else {
+            app.log('evtsig_bnk_convert v is null');            
+        }
+
+    }
+
+    evtsig_dlg_bnk_end (event, elt, details) {
+        this.reset_dlg_bnks();   
+    }
+
+    evtsig_dlg_bnk_copy (event, elt, details) {
+        let modal = document.getElementById('id_dlg_bnks'); 
+        let elt_textarea = modal.querySelector('#'+'id_dlg_bnk_src');  
+        elt_textarea.focus();
+        elt_textarea.select();
+        document.execCommand('copy');
+        elt_textarea.setSelectionRange(0, 0);
+    }
+
+    async evtsig_bnk_cnvrt_prg (event, elt, details) {
+        let modal = document.getElementById('id_dlg_bnks'); 
+        let elt_textarea = modal.querySelector('#'+'id_dlg_bnk_src');  
+        let elt_btns =     modal.querySelector('#'+'id_dlg_bnk_btns');  
+        let elt_dwnld =    modal.querySelector('#'+'id_dlg_bnk_dwnld');  
+
+        let method = '';
+        switch (elt.innerText) {
+            case 'Crédit Agricole':  
+                method =    "decodeFromISO_8859_15()\\n"+
+                            "changeCRinQuotes(' ')\\n"+
+                            "removeExtraSpaces()\\n"+
+                            "removeExtraTabs()\\n"+
+                            "removeNoBreakSpaces()\\n"+
+                            "removeMoneySign()\\n"+
+                            "removeRowIfNoDate(1)\\n"+
+                            "changeColumnsOrder('1;2;5;3;4')\\n";
+                break;
+            case 'LCL':  
+                method =    "changeColumnsOrder('1;2;3>')\\n"+
+                            "removeExtraSpaces()\\n";
+                break;
+            case 'Banque postale':  
+                method =    "changeColumnTabToSemicolon()\\n"+
+                            "removeRowIfNoDate(1)\\n"+
+                            "changeColumnsOrder('1;2;if+3;if-3')\\n";
+                break;
+        }
+
+        let outtxt = this.run_prog( method, elt_textarea.value );
+        if (!outtxt)  {
+            app.log('evtsig_bnk_cnvrt_prg error during prog');
+            return;
+        }
+
+        elt_textarea.value = outtxt;
+        elt_btns.style.display = 'none';
+        elt_dwnld.style.display = 'flex';
+
+        let json =  await this.post_cmd( 'post_prepare_download', outtxt );
+        if (json.msg != "") app.popup ( 'msg = \\n' + json.msg + '\\n' + '' );
+        
+    }
+
+    reset_dlg_bnks(){
+        let modal = document.getElementById('id_dlg_bnks'); 
+        let elt_p =        modal.querySelector('#'+'id_dlg_bnk_p');  
+        let elt_textarea = modal.querySelector('#'+'id_dlg_bnk_src');  
+        let elt_btns =     modal.querySelector('#'+'id_dlg_bnk_btns');  
+        let elt_dwnld =    modal.querySelector('#'+'id_dlg_bnk_dwnld');  
+        let elt_dropfile = modal.querySelector( DmcDropfile.get_root_elt_selector() );
+
+        elt_p.innerText = "Conversion d'un fichier venant d'une banque";
+        elt_textarea.style.display = 'none';
+        elt_dropfile.style.display = 'block';
+        elt_btns.style.display = 'none';
+        elt_dwnld.style.display = 'none';
+    }
+
+
+    async slot_dropfile_bnk_cagr( ev, files, modal ) {
+
+        if (files.length != 1) {
+            app.error('Please drop only one file');
+            return;
+        }
+
+        let elt_textarea = modal.querySelector('#'+'id_dlg_bnk_src');  
+        let elt_dropfile = modal.querySelector( DmcDropfile.get_root_elt_selector() );
+        let elt_btns =     modal.querySelector('#'+'id_dlg_bnk_btns');  
+
+        let txt = await DmcDropfile.convfile(files[0]);
+        elt_textarea.value = txt;
+        elt_textarea.style.display = 'block';
+        elt_dropfile.style.display = 'none';
+        elt_btns.style.display = 'block';
+
+        // app.log('slot_dropfile_bnk_cagr');
+    }
+
+// ===================================
+// ===================================
+
 
     async evtsig_test5_post_test() {
         let json =  await this.post_cmd( 'post_test', 'testCookie', '42' );
@@ -1007,16 +1230,22 @@ Voici la liste des champs reconnus :
 
 
     evtsig_test_worker() {
+
+        //  if (this.worker1) {    this.worker1.terminate();    this.worker1 = null;    }
+
         if (!this.worker1) {
             this.worker1 = new Worker('src/worker1.js');
             this.worker1.onmessage = function(e) {
-              console.log('Message reçu depuis le worker : '+e.data);
+              app.log('worker1.js says : '+e.data);
             }
         }
 
-        this.worker1.postMessage([15, 16]);
-        app.log('Message envoyé au worker');
 
+        // this.worker1.addEventListener("message",  
+        //     function(msg) {   app.log('The worker says : '+msg.data);  }  );
+
+
+        this.worker1.postMessage([15, 16]);
     }
 
 
@@ -1281,6 +1510,11 @@ SOFTWARE.</pre>
         app.log('undo');
     }
 
+    async evtsig_prepare_download() {
+        this.hideMenu(event);
+        let json =  await this.post_cmd( 'post_prepare_download', this.elt_file_src.value );
+        if (json.msg != "") app.popup ( 'msg = \\n' + json.msg + '\\n' + '' );
+    }
 
     // ================ end of cmds ===============
     // ============================================
@@ -1314,6 +1548,10 @@ $html_dialogs = <<<EOLONGTEXT
             <p data-modal="p_text" data-title="title_bar">Title</p>
       </div>
     </dialog>
+
+
+
+
 
     <dialog id="id_dlg_test3" class="dmc_modal fade-in" style="display:none;">
       <div id="id_dlg_content" class="dm_modal_content">
@@ -1477,9 +1715,9 @@ $html_menu = <<<EOLONGTEXT
             <div>
             <a signal="click››evtsig_changeColumnToSemicolonFromComma"
                 statusmsg="change column delimiter [,] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [,] =&gt; [;]</a>
-            <a signal="click››evtsig_changeColumnToSemicolon"
+            <a signal="click››evtsig_changeColumnTabToSemicolon"
                 statusmsg="change column delimiter [tab] =&gt; [;] (but not inside &quot;strings&quot;)">change column delimiter [tab] =&gt; [;]</a>
-            <a signal="click››evtsig_changeColumnToTab"
+            <a signal="click››evtsig_changeDelimiterSemicolumnToTab"
                 statusmsg="change column delimiter [;] =&gt; [tab] (but not inside &quot;strings&quot;)">change column delimiter [;] =&gt; [tab]</a>
             </div>
         </li></ul>
@@ -1516,8 +1754,23 @@ $html_menu = <<<EOLONGTEXT
         </div>
     </li>
 
+
+
+    <li id="id_mnu_tools"><a signal="click››evtsig_bnk_convert">Banques</a>
+    </li>
+
+
+
     <li id="id_mnu_tools"><a>Tools</a>
         <div class="div_menu">
+        <a onclick="DmcDropfile.ev_choosefile(event)">open file
+            <form class="form_dropfile_select">
+            <input type="file" id="DmcDropfile_selectfile" style="display:none;"/>
+            </form>
+        </a>
+
+        <a signal="click››evtsig_prepare_download">prepare download</a>
+        <a href="?do=download" target="_blank" rel="noopener noreferrer">download</a>
         <a signal="click››evtsig_undo">undo</a>
         <a signal="click››evtsig_copy">copy</a>
         <a signal="click››evtsig_empty">empty</a>
@@ -1599,6 +1852,23 @@ function main() {
     $dm = CModules::$_this;
     $m = new CPrjMain();
     $m->init_session();
+
+    if ( isset($_GET['do']) &&  $_GET['do']=='download' )  {
+        header("Content-type: text/csv");
+        header("Content-Disposition: attachment; filename=file.csv");
+        header("Pragma: no-cache");
+        header("Expires: 0");
+
+        $filepath = 'rw/' . $m->session_hash . '.csv';
+        try {
+            $txt = file_get_contents($filepath);
+        } catch (Exception $e){
+            // $data['error'] = 'CMainPhp::post_prepare_download error : Exception '.$e->getMessage();
+        }
+        echo $txt;
+        return;
+    }
+
     $m->read_post_data();
     $m->header();
     $m->head();
@@ -1653,10 +1923,40 @@ function main() {
 
 
         echo $dm->sml_mustache( <<<EOLONGTEXT
+        <dialog id="id_dlg_bnks" class="dmc_modal fade-in" style="display:none;position:fixed;">
+          <div id="id_dlg_bnk_content" class="dm_modal_content">
+            <span class="btn_modal_close" data-modal="btn_close">&times;</span>
+            <p id="id_dlg_bnk_p"></p>
+            {{mod_html_div_dropfile}}
+            <textarea id="id_dlg_bnk_src" class="std_textarea"
+                style="width:100%; height:10em;" >    
+            </textarea>
+            <div id="id_dlg_bnk_btns" class="dlg_bnk_btns">
+                <button type="button"   signal="click››evtsig_bnk_cnvrt_prg" 
+                 statusmsg="Fichier csv du crédit agricole">Crédit Agricole</button>
+                <button type="button"   signal="click››evtsig_bnk_cnvrt_prg" 
+                 statusmsg="Fichier csv  LCL">LCL</button>
+                <button type="button"   signal="click››evtsig_bnk_cnvrt_prg" 
+                 statusmsg="Fichier tsv la Banque Postale">Banque postale</button>
+            </div>
+            <div id="id_dlg_bnk_dwnld" class="dlg_bnk_dwnld" style="display:flex; justify-content:space-around;">
+                <a href="?do=download" target="_blank" rel="noopener noreferrer">Télécharger</a>
+                <a signal="click››evtsig_dlg_bnk_copy">Copier dans le presse-papier</a>
+                <a signal="click››evtsig_dlg_bnk_end">Terminer</a>
+            </div>
+          </div>
+        </dialog>
+        EOLONGTEXT, [ 
+            'mod_html_div_dropfile' => $dm->mod_get_elt( 'div-dropfile.mod.php', 'mod_html_div_dropfile' ) 
+
+        ] );
+
+
+        echo $dm->sml_mustache( <<<EOLONGTEXT
 
         <div class="dmc_flexvert" style="flex:1;">
 
-        <textarea id="id_file_src" class="dmc_flexvert_child_fix txt_file_src rounded_div" 
+        <textarea id="id_file_src" class="dmc_flexvert_child_fix std_textarea rounded_div div_dropfile" 
             onpaste="app.event_file_src_onpaste(event)" 
             oninput="app.event_file_src_oninput(event)" 
             onmouseup="app.event_file_src_onmouseup(event)"
@@ -1667,62 +1967,68 @@ function main() {
         </div>
 
         <div class="dmc_flexvert_child_expand" > 
-          <div class="dmc_respcardcontainer">
-            <div id="id_card1" class="dmc_respcard">
+
+
+
+
+        <div class="dmc_flexhori">
+
+            <div id="id_prog_list" class="dmc_flexhori_child_fix" style="padding:0.5em;" 
+            msignal="resize_mouseup››msig_flexhori_resize">
+                <p><span style="display:inline-block; border-radius:1em;" class="appli_std_color"> &nbsp; <i class="f7-icons" >tray_fill</i> &nbsp;</span> Liste des programmes</p>
+                <fieldset id="id_lsbx_processes"  mwgtclass="WgtListbox" 
+                    msignal="item_dblclick››msig_lsbx_processes_dblclick,item_contextmenu››msig_lsbx_processes_cntxtmnu"  
+                    data-LSCookie="lsbx_processes_content"
+                    class="wgt_listbox wgt_listbox_oneonly">
+                    <!-- legend > style="max-height:5em;"  </legend --> 
+                </fieldset>
+                <p>(double-click pour le charger)</p>
+                <p>(click-droite pour le menu ctx)</p>
+            </div>
+
+            <div class="dmc_flexhori_child_separator" > 
+            </div>
+
+            <div class="dmc_flexhori_child_expand" style="padding:0.5em;">
                 <p>Programme</p>
                 <p>Nom: <input id="id_cmdlst_title" type="text" class="program_edit" name="title" 
                     style=" margin:0 auto; " value=""/>
-
-                <button type="button" class="program_edit" signal="click››evtsig_prog_save" 
-                 statusmsg="Save this program.">
+                <button type="button" class="program_edit dmcss_tooltip"
+                 signal="click››evtsig_prog_save" 
+                 statusmsg="Save this program."
+                 data-tooltip="Save it into the programs list">
                  <i class="f7-icons" >tray_arrow_down_fill</i>
                  </button>
-                <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog"
-                 statusmsg="Run the program and show the result">
+                <button type="button" class="program_edit dmcss_tooltip left_bottom" signal="click››evtsig_btn_run_prog"
+                 statusmsg="Run the program and show the result (no filter possibilities)"
+                 data-tooltip="Run the programme (no filter possibilities)">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
-                <button type="button" class="program_edit" signal="click››evtsig_btn_run_prog_filter"
-                 statusmsg="Run the program and show the result, filter is possible (not finished)">
+                <button type="button" class="program_edit dmcss_tooltip right_bottom" signal="click››evtsig_btn_run_prog_filter"
+                    statusmsg="Run the program, keyword filter is possible,  (beta test)"
+                    data-tooltip="Run the program, keyword filter is possible,  (beta test)"">
                  <i class="f7-icons" >play_rectangle_fill</i>
                  </button>
                 </p>
-                <textarea id="id_cmdlst_textarea" class="program_edit"
+                <textarea id="id_cmdlst_textarea" class="program_edit"  
                     onmouseup="app.event_cmdlst_textarea_onmouseup(event)"
                     oninput="app.event_cmdlst_textarea_oninput(event)">
                 </textarea>
                 <p></p>
             </div>
 
-            <div id="id_card3" class="dmc_respcard">
-                <p><span style="display:inline-block; border-radius:1em;" class="appli_std_color"> &nbsp; <i class="f7-icons" >tray_fill</i> &nbsp;</span> Liste des programmes</p>
-                <fieldset id="id_lsbx_processes"  mwgtclass="WgtListbox" 
-                    msignal="item_dblclick››msig_lsbx_processes_dblclick,item_contextmenu››msig_lsbx_processes_cntxtmnu"  
-                    data-LSCookie="lsbx_processes_content"
-                    class="wgt_listbox wgt_listbox_oneonly" style="max-height:5em;">
-                    <!-- legend ></legend --> 
-                </fieldset>
-                <p>(double-click pour le charger)</p>
-                <p>(click-droite pour le menu ctx)</p>
-            </div>
 
-            <div class="dmc_respcard">
-                {{mod_html_div_dropfile}}
-            </div>
+        </div>
 
 
-            <div id="id_card4" class="dmc_respcard">
-                <p class="tooltip" data-tooltip="Thanks for hovering! I'm a tooltip">test WgtTable</p>
-                <table id="id_wgt_table2"  mwgtclass="WgtTable" 
-                    class="wgt_table " style="">
-                </table>
-            </div>
-
+          <div class="dmc_respcardcontainer">
           </div>
+
         </div>
         </div>
 
         EOLONGTEXT, [ 
-            'mod_html_div_dropfile' => $dm->mod_get_elt( 'div-dropfile.mod.php', 'mod_html_div_dropfile' ) 
+         //   'mod_html_div_dropfile' => $dm->mod_get_elt( 'div-dropfile.mod.php', 'mod_html_div_dropfile' ) 
 
         ] );
 
