@@ -122,40 +122,51 @@ class WgtLogin extends DmcBase {
         this.constructor._this = this;
     }
 
-    static onload ( parent ){
+
+    static onload ( parent ) {
         super.onload( parent );
         this.connect_events( parent );
         this.do_login_onload();
     } 
 
+    static getLastuser() {
+        return {    lastuser:   app._getLSCookie('LSC_username'),
+                    watermark:  app._getLSCookie('LSC_watermark'),
+                    wm_time:    app._getLSCookie('LSC_wm_time')     }
+    }
 
+    static setLastuser( username, watermark, wm_time ) {
+        app._setLSCookie('LSC_username',    username);
+        app._setLSCookie('LSC_watermark',   watermark);
+        app._setLSCookie('LSC_wm_time',     wm_time);
+    }
 
     static async post_check_watermark(){
-        let lastuser  = app._getLSCookie('LSC_username');
-        let watermark = app._getLSCookie('LSC_watermark');
-        let wm_time   = app._getLSCookie('LSC_wm_time'); 
-        if (!lastuser || !watermark || watermark=='') 
+        let li = WgtLogin.getLastuser();
+        if (!li.lastuser || !li.watermark || li.watermark=='') 
             return false;
 
         let json =  await app.post_cmd( 'post_check_watermark', 
-            { user:lastuser,  watermark:watermark, wm_time:wm_time } );
+            { user:li.lastuser,  watermark:li.watermark, wm_time:li.wm_time } );
         if (json && json.return) {
             // success
-            app.log( 'WgtLogin::post_check_watermark '+ json.msg + ' age='+ json.age+'s'+ 
-                     ', post_cmd duration='+json._duration+'ms');
+            app.log( 'WgtLogin::post_check_watermark '+ json.msg + ' age='+ json.age+'s');
+            app.log( 'WgtLogin::post_check_watermark '+
+                     ' post_cmd duration='+json._duration+'ms, wmcost='+json._wmcost+'ms');
             return true;
         } else {
             // if (json)  app.log(json.msg);
             WgtLogin.do_logout();
-            Application.signal( 'slot_event_logout', null, null, { user:lastuser } );
+            Application.signal( 'slot_event_logout', null, null, { user:li.lastuser } );
         }
         return false;
     }
 
+
     static async do_login_onload() {
-        let lastuser  = app._getLSCookie('LSC_username');
-        let check = await WgtLogin.post_check_watermark ();
-        Application.signal( 'slot_event_login', null, null, { user:lastuser, check:check } );
+        let li = WgtLogin.getLastuser();
+        let check = await WgtLogin.post_check_watermark();
+        Application.signal( 'slot_event_login', null, null, { user:li.lastuser, check:check } );
     }
 
 
@@ -205,14 +216,10 @@ class WgtLogin extends DmcBase {
 
 
     static async do_logout() {
-        let lastuser  = app._getLSCookie('LSC_username');
-        app._setLSCookie('LSC_watermark', undefined);
-        app._setLSCookie('LSC_wm_time',   0);
-
-        let json =  await app.post_cmd( 'post_logout', { user:lastuser } );
-        // app.log('evtsig_logout user='+lastuser);        
-
-        Application.signal( 'slot_event_logout', null, null );
+        let li = WgtLogin.getLastuser();
+        WgtLogin.setLastuser( li.username, undefined, 0 );                          // forget security parameters
+        let json =  await app.post_cmd( 'post_logout', { user:li.lastuser } );      // tell php server we have logout
+        Application.signal( 'slot_event_logout', null, null );                      // tell app we have logout
     }
 
 
@@ -221,29 +228,25 @@ class WgtLogin extends DmcBase {
         let elt_username = document.getElementById("username");
         let elt_dialog = DmcModal.getContainer(elt_username);
         let elt_result = document.getElementById("id_login_result");
-        let json =  await app.post_cmd( 'post_login', { user:user, password:passw } );
+        let json =  await app.post_cmd( 'post_login', { user:user, password:passw } );  // ask php server for login
 
         if (json && json.watermark != ''){
-            // app.log( JSON.stringify( json ) );              
             elt_result.innerHTML = escapeHtml('Login successfull ! ') + 
-                    app.icon('f7-icons', 'hand_thumbsup_fill'); // 'hand_thumbsup');  
-            app._setLSCookie('LSC_username',  user);
-            app._setLSCookie('LSC_watermark', json.watermark );   // cryptoUniquePassword()
-            app._setLSCookie('LSC_wm_time',   json.wm_time ); 
+                    app.icon('f7-icons', 'hand_thumbsup_fill');
 
+            WgtLogin.setLastuser( user, json.watermark, json.wm_time );             // memo security parameters
+            Application.signal( 'slot_event_login', null, null,                     // tell app we have login
+                    { user:user, check:true } );
             DmcModal.resetForms( elt_dialog.id );
             elt_username.value = user;
-
-            Application.signal( 'slot_event_login', null, null, { user:user, check:true } );
-
-            DmcModal._setTimeout( elt_dialog, 1 );
+            DmcModal._setTimeout( elt_dialog, 1 );                                  // close modal dlg
         }
         else {
-            if (!json){
+            if (!json) {
                 app.log( 'WgtLogin::do_login error : post_login json is null' );
-                elt_result.innerText = 'Login error';
+                elt_result.innerText = 'WgtLogin::do_login error';
             } else {
-                elt_result.innerText = json.msg;
+                elt_result.innerText = 'WgtLogin::do_login ' + json.msg;
             }
         }
 
@@ -267,16 +270,8 @@ class WgtLogin extends DmcBase {
         id_form_login.style.display = 'none';
         id_form_logout.style.display = 'none';
         id_form_create.style.display = 'flex';
-        
-        /*
-        let lastuser =  document.getElementById("username").value;
-        let password =  document.getElementById("password").value;
-        let random   = document.getElementById("id_random");
-
-        app._getLSCookie('LSC_username');
-        app._getLSCookie('LSC_watermark');
-        */
     }
+
 
     async evtsig_logout( event, elt ) {
         let elt_username = document.getElementById("username");
@@ -293,31 +288,18 @@ class WgtLogin extends DmcBase {
 
 
 
-    /*
-=    evtsig_do_showpsw  
-=    evtsig_do_showpsw1  
-=    evtsig_do_refresh_suggest  
-=    evtsig_do_refresh_copy  
-=    evtsig_do_login 
-=    evtsig_do_create 
-=    evtsig_logout 
-    */
-
-
     static showDialog(elt) {
 
         let elt_result = document.getElementById("id_login_result");
         elt_result.innerText = '';
+        let li = WgtLogin.getLastuser();
 
-        let lastuser = app._getLSCookie('LSC_username');
-        let watermark = app._getLSCookie('LSC_watermark');
-
-        document.getElementById("id_dlg_username").value = lastuser; 
+        document.getElementById("id_dlg_username").value = li.lastuser; 
         let id_form_login  = document.getElementById("id_form_login");
         let id_form_logout = document.getElementById("id_form_logout");
         let id_form_create = document.getElementById("id_form_createaccount");
 
-        if (lastuser && watermark) {
+        if (li.lastuser && li.watermark) {
             document.getElementById("id_login_title").innerText = "Logout";
             id_form_login.style.display = 'none';
             id_form_logout.style.display = 'flex';     
@@ -334,9 +316,9 @@ class WgtLogin extends DmcBase {
         }
 
         DmcModal.show( "id_dlg_login" ); 
-        if (lastuser) {
+        if (li.lastuser) {
             let elt_username = document.getElementById("username");
-            elt_username.value = lastuser;
+            elt_username.value = li.lastuser;
         }
     }
 

@@ -144,14 +144,6 @@ ul.dmc_menu {
     background-color: var(--main_color);  
 }
 
-ul.dmc_menu li  form   {     
-  /*  background-color: #0001;  */
-}
-
-ul.dmc_menu li  form  table  { 
-    border: 0;  
-}
-
 ul.dmc_menu li {   
     padding: 0.4em 1em 0.4em 1em;
     position: relative;
@@ -166,6 +158,18 @@ ul.dmc_menu li:hover {
 ul.dmc_menu li a {
     cursor: pointer;
 }   
+
+ul.dmc_menu li  form   {     
+}
+
+ul.dmc_menu li  form  table  { 
+    border: 0;  
+}
+
+ul.dmc_menu li table  { 
+    border: 0;  
+}
+
 
 ul.dmc_menu li div.div_menu {   
     display: none;
@@ -198,14 +202,28 @@ ul.dmc_menu li div.div_menu form:hover {
     background-color: var(--main_color_hover);  
 }
 
+ul.dmc_menu li div.div_menu table {   
+    border: 0;  
+    width: 100%;
+}
+
+ul.dmc_menu li div.div_menu table:hover {   
+    background-color: var(--main_color_hover);  
+}
+
 ul.dmc_menu li div.div_menu table td {   
     padding: 0.4em;
 }
 
 
-ul.dmc_menu li div.div_menu ul {   
+ul.dmc_menu li div.div_menu div.line {   
     display: block;
     list-style: none;
+    padding: 0.4em;
+}
+
+ul.dmc_menu li div.div_menu div.line:hover {   
+    background-color: var(--main_color_hover);  
 }
 
 ul.dmc_menu li div.div_menu ul {   

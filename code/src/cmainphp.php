@@ -187,13 +187,36 @@ class CMainPhp {                    // base class for CPrjMain
     }
 
 
+    /*
+
+    password_hash
+        PASSWORD_DEFAULT - Use the bcrypt algorithm (default as of PHP 5.5.0). 
+        Note that this constant is designed to change over time as new and stronger algorithms are added to PHP. 
+        For that reason, the length of the result from using this identifier can change over time. 
+        Therefore, it is recommended to store the result in a database column that can expand beyond 60 characters (255 characters would be a good choice). 
+
+    */
 
 
-    function calcWaterMark( $user, $password, $time ) {
+    function calcWaterMark( $user, $password, $time ) {     // length of watermark : choose 255 byte for security
+        /*
         $watermark =  $user."{$time}".$password.$this->server_name;
         $watermark =  substr(md5($watermark), 2, 10);
         return $watermark;
+        */
+        $sentence =  $user."{$time}".$password.$this->server_name;
+        $watermark = password_hash($sentence, PASSWORD_DEFAULT);
+        return $watermark;
     }
+
+
+
+    function checkWaterMark( $user, $password, $time, $wm ) {
+        $sentence =  $user."{$time}".$password.$this->server_name;
+        $check = password_verify($sentence, $wm);
+        return $check;
+    }
+
 
 
     function get_userdb( & $ob ) {
@@ -238,40 +261,6 @@ class CMainPhp {                    // base class for CPrjMain
 // ===============================
 
 
-            /*
-
-              try {
-                $rq['rq']  = json_decode( base64_decode($_POST['rq']) ); 
-              } catch (Exception $e) {
-                $rq['exception rq'] = $e->getMessage();
-              }
-
-                if ( file_exists($fileLib) ) {
-                    try {
-                        include_once( $fileLib );      
-                        $rq['return'] = call_user_func_array( $fct, array( & $rq ) );
-                    } catch (Throwable $e) {
-                      $err = 'error in file:'.$e->getFile().' line:'.$e->getLine().' exception:'.$e->getMessage(); 
-                            // ' file:'.$e->getFile();
-                    }
-                } 
-
-                switch ($p3) {
-                    case 'number':
-                        $p2 = (float) $p2;
-                        if (floor($p2) == $p2)  $p2 = (int) $p2;
-                        break;
-                    case 'boolean':
-                        $p2 = $p2 == 'true' ? true : false;
-                        break;
-                }
-                $typ1 = gettype($p2);
-
-            */
-
-
-
-
     function post_Upload_XMLHttp( & $data, $args ) {
 
         if ( !is_array($_FILES) ) { 
@@ -296,20 +285,41 @@ class CMainPhp {                    // base class for CPrjMain
 
         $data['file'] = base64_encode($r);
         $data['msg'] = "CMainPhp::post_Upload_XMLHttp ok";
-
-        /*
-            [name] => CA20221225_150649.csv
-            [type] => text/csv
-            [tmp_name] => /private/var/folders/bk/l9_hb9kj0cdc3gxrhb3_m1s4000102/T/phpUUEI4F
-            [error] => 0
-            [size] => 2518
-
-            $fileExtension = strtolower( pathinfo($fileName, PATHINFO_EXTENSION) );
-            $uploadPath    = get_wdir() ."/". basename($fileName);
-        */                
-
     }
 
+
+    /*
+        ====================================
+        ====================================
+        login variables usefull
+        ====================================
+        ====================================
+
+    login
+    ---------
+        $_SESSION['user']       $data['user']
+        $_SESSION['wm_time']    $data['wm_time']        // check password ok at this moment
+                                $data['watermark']      // calc & sent when password is ok
+
+    logout
+    ---------
+        $_SESSION['user']       = '';
+        $_SESSION['wm_time']    = null;
+
+    tic often check watermark
+    ---------
+        $_SESSION['tic']  = $time;
+        $_SESSION['wm_tic']  = $time;                   // when tic check ok the watermark
+                                
+    check_watermark
+    ---------
+        if (watermark is ok)
+            $data['age']      = $time - $args[0]->wm_time;
+            $data['tic_age']  = $time - $_SESSION['wm_tic'];
+
+        ====================================
+        ====================================
+    */
 
 
 
@@ -328,17 +338,17 @@ class CMainPhp {                    // base class for CPrjMain
         }
 
         $password = $ob[ $args[0]->user ];
-        $watermark  = $this->calcWaterMark( $args[0]->user, $password, $args[0]->wm_time );
-        if ( $watermark != $args[0]->watermark )  {
+
+        $t0 = time();
+        $check   = $this->checkWaterMark( $args[0]->user, $password, $args[0]->wm_time, $args[0]->watermark );
+        $data['_wmcost'] = time() - $t0;
+        if ( !$check )  {
             $data['msg']        = "CMainPhp::post_check_watermark error: bad watermark";
             return;
         }
 
-            
-
         $time = time();
         $data['age']      = $time - $args[0]->wm_time;
-
 
         // Undefined index: wm_tic 
         if (in_array('wm_tic', $_SESSION )) {
@@ -346,20 +356,24 @@ class CMainPhp {                    // base class for CPrjMain
         } else {
             $data['tic_age']  = 0;            
         }
+        
+        /*  ======== never too old
         if ($data['age']     > 12 * 60*60 ||        // 60sec * 60mn *12 = 12h
             $data['tic_age'] >      60*5      ) {   // 60sec * 5mn = 5mn
             $data['msg']  = "CMainPhp::post_check_watermark too old";
             return;
-        }
+        } */
 
         $data['msg']        = "CMainPhp::post_check_watermark success";
         $data['return']     = true;
     }
 
+
+
     function post_login( & $data, $args ) {
 
         $this->get_userdb( $ob );
-        $data['wm_time']    = time();
+        $data['wm_time']    = time();       // check password ok at this moment
         $data['watermark']  = '';
         $data['user']       = $args[0]->user; 
         usleep(300 * 1000);        // sleep 300ms env
@@ -375,9 +389,11 @@ class CMainPhp {                    // base class for CPrjMain
         $data['watermark']  = $this->calcWaterMark( $args[0]->user, $args[0]->password, $data['wm_time'] );
         $data['msg']        = "CMainPhp::post_login success";
         $_SESSION['user']       = $data['user'];
-        $_SESSION['wm_time']    = $data['wm_time'];
+        $_SESSION['wm_time']    = $data['wm_time']; // check password ok at this moment
 
     }
+
+
 
     function post_logout( & $data, $args ) {
         $_SESSION['user']       = '';
@@ -407,25 +423,21 @@ class CMainPhp {                    // base class for CPrjMain
         
     }
 
+
     function post_tic( & $data, $args ) {
         $time = time();
         $_SESSION['tic']  = $time;
-
         $data['news']  = '';
+
 
         // ======================
         //  check watermark
         // ======================
         $this->get_userdb( $ob );
-        /*     error if user is not in $ob
-        try {
-            $z2 = $ob[ $args[0]->user ];
-        } catch (Exception $e){
-            $data['news']  .= 'unknown user '.$args[0]->user;
-        }
-        */
-        $watermark  = $this->calcWaterMark( $args[0]->user, $ob[ $args[0]->user ], $args[0]->wm_time );
-        if ( $watermark == $args[0]->watermark )  {
+        $passwd = array_key_exists($args[0]->user, $ob)   ?   $ob[$args[0]->user]    :   '';
+
+        $check  = $this->checkWaterMark( $args[0]->user, $passwd, $args[0]->wm_time, $args[0]->watermark  );
+        if ( $check )  {
             $data['return']  = true;
             $_SESSION['wm_tic']  = $time;
         }
@@ -439,7 +451,7 @@ class CMainPhp {                    // base class for CPrjMain
         if ( $_SESSION['hour'] != $hour ) {
             // create new information :
             $_SESSION['news'][$time] = [
-                 'msg'    => "now is is ".$hour
+                 'msg'    => "now it is ".$hour
                 ];
             $data['news']  .= 'welcome in hour  = '.$hour.' before value was '.$_SESSION['hour'];
             $_SESSION['hour'] = $hour; 
@@ -455,9 +467,35 @@ class CMainPhp {                    // base class for CPrjMain
         $data['msg']  = "CMainPhp::post_tic time={$time}";
     }
 
+
     function post_test( & $data, $args ) {
 
-        $data['msg']  = "\$_POST var = ".print_r( $_POST, true );
+        $s = '';
+        if (!property_exists($this, 'dbase')) {
+            try {
+                $this->dbase = new CDbase();
+                $this->table = new CDbTable($this->dbase, 'users');
+            } catch (Exception $e){
+                unset($this->dbase);
+                unset($this->table);
+            }
+        }
+
+        // $fields = $this->table->_getFields();    echo "fields = " .print_r( $fields, true )."\n";
+        /*
+        $rec=[];
+        $rec['email']  = 'jflemay@hotmail.com';
+        $rec['passwd'] = 'faat';
+        if (!$this->table->appendRecord($rec)) { $s .= $this->table->last_exception; }
+        */
+        
+        $rec = $this->table->getRecord('email', 'jflemay@hotmail.com');
+
+        if (property_exists($this, 'table')) {
+            $data['msg'] = "table exists ! rec = " .print_r( $rec, true )."\n".$s;
+
+        } else 
+            $data['msg']  = "\$_POST var = ".print_r( $_POST, true );
         
     }
 

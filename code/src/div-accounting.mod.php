@@ -122,6 +122,7 @@ class DmcAccounting  {   // extends DmcBase
         }
         for (let n=1; n<lines.length; n++) {
             if ( lines[n] == '' ) continue;
+            if ( lines[n].startsWith('//') ) continue;
             let entry = columnSplit( lines[n] );
             let maxlen = this.colNames.length;
             if (entry.length<maxlen) maxlen = entry.length;
@@ -256,6 +257,7 @@ class DmcAccounting  {   // extends DmcBase
         let col = this.getColIndexes();
         let solde = 0.0, numEcr=1;
         let fmt = [ 'DatEcr', 'Journal', 'Compte', 'Libelle', 'Debit', 'Credit' ];
+        let supcompte = ( CompteName && CompteName.endsWith('>') ) ? substrbefore(CompteName, '>') : false;
 
         innerHtml +=  '<tr>' + this.createRow( fmt.concat(['Solde']) ) + '</tr>\\n';
 
@@ -263,7 +265,8 @@ class DmcAccounting  {   // extends DmcBase
             let entry = dbEntries[row];
             let style = '';
             if (journalName && entry[col.Journal]!=journalName) continue;
-            if (CompteName  && entry[col.Compte] !=CompteName)  continue;
+            if (supcompte   && !entry[col.Compte].startsWith(supcompte))  continue;
+            if (CompteName && !supcompte  && entry[col.Compte] !=CompteName)  continue;
             let x = entry[col.Debit] - entry[col.Credit];
             solde += x;
             let modulo = numEcr % 2;
@@ -585,7 +588,7 @@ class DmcAccounting  {   // extends DmcBase
 
 
 
-    calcBalanceFilter_( dbEntries, searchCompte, op, filter = [] )  {
+    calcBalanceFilter__obsolete( dbEntries, searchCompte, op, filter = [] )  {
         let bal = {};
         let col = this.getColIndexes();
 
@@ -614,7 +617,7 @@ class DmcAccounting  {   // extends DmcBase
 
 
 
-    calcBalanceFilter__( dbEntries, searchCompte, op, filter = '', subarr = undefined )  {
+    calcBalanceFilter___obsolete( dbEntries, searchCompte, op, filter = '', subarr = undefined )  {
 
         let col = this.getColIndexesTotal();
         if (searchCompte != '') {
@@ -687,14 +690,12 @@ class DmcAccounting  {   // extends DmcBase
 
 
 /*    =======================================================
-        Immobilisations incorporelles 010| 20>DC + 280>DC
-        Immobilisations corporelles 010|   21>DC + 281>DC
-        Reste 28|                          !28>DC
-        Reste  512|                        !512>DC
-        Banque 512101|                     512101=DC
+
+        Beta test : try filters
+
       =======================================================
 */
-    etatParametrableFilter( dbEntries, method ) {
+    etatParametrableFilter_obsolete( dbEntries, method ) {
         let _this = this;  // keep for sub function
         let col = this.getColIndexes();
         let methods = method.split('\\n');
@@ -872,8 +873,11 @@ class DmcAccounting  {   // extends DmcBase
         }
 
 
+        // list rests :
+        // =============
+
         let needSep = true;
-        let bal = this.calcBalanceFilter_( db, '', '' );
+        let bal = this.calcBalanceFilter_( db, '60', '' );
         for (let compte in bal) {
             let c = bal[compte];
             if ( c.Debit == 0 && c.Credit == 0 ) continue;
@@ -893,7 +897,7 @@ class DmcAccounting  {   // extends DmcBase
 
 
         return innerHtml;
-    } // etatParametrableFilter
+    } // etatParametrableFilter_obsolete
 
 
 

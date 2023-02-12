@@ -97,7 +97,7 @@ magic_opacity{
   min-width:   3em;
   max-width:   10em;
   width:       max-content;
-  padding:      1em;  /* space between border and content */
+  padding:     0.3em; 
   border: 1px solid darkgrey;
   background:#eee;
   color: #333;

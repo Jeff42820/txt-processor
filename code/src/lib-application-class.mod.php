@@ -146,7 +146,6 @@ class DmcBase {
             for (let i=0; i < elts.length; i++) {
                 let elt = elts[i];
                 if (!elt.id)  elt.id = this.createUniqueId();
-                // cl.elts[elt.id] = elt;
                 this._elements[elt.id] = { elt:elt,  class: cl, data: {} };
             }
         }
@@ -415,6 +414,7 @@ class Application {
         return c;
     }
 
+
     _setLSCookie( cname, cvalue ) {
         return setLSCookie( this.name + cname, cvalue );
     }
@@ -423,22 +423,29 @@ class Application {
         resetLSCookie(app.name);
     }
 
+
     _slotLSCookieChanged(event) {
         let input = event.target;
         let attr = input.getAttribute('LSCookie');
         let value = input.value;
         this._setLSCookie(attr, value);
-        // app.log('_slotLSCookieChanged '+attr+' = '+value);
     }
 
     _keyOnMenuInput(event) {
         if (event.key === 'Enter' || event.keyCode === 13) {
             //app.log('evtsig_keyOnMenuInput '+event.type+' '+event.target.tagName);
             event.target.dispatchEvent( new Event("change") );
-            let parentTd = event.target.parentElement.parentElement;
-            let firstChildSpan = parentTd.firstChild.firstChild;
+            let parentDiv = event.target.parentElement;
+            if (parentDiv.tagName == 'DIV') {
+                let firstChildSpan = parentDiv.firstElementChild;
+                if (firstChildSpan) firstChildSpan.dispatchEvent( new Event("click") );
+            } 
+            /* old obsolete way else {
+                let parentTd = event.target.parentElement.parentElement;
+                let firstChildSpan = parentTd.firstChild.firstChild;
+                if (firstChildSpan) firstChildSpan.dispatchEvent( new Event("click") );
+            } */
             event.preventDefault();
-            firstChildSpan.dispatchEvent( new Event("click") );
             return false;
         }
     }
@@ -446,6 +453,8 @@ class Application {
     _connectLSCookies() {
         // Connect slots to LSCookie elements
         // ====================================== 
+        
+        /*
         let elts = document.body.getElementsByTagName('form');      // root balise for LSCookie in menus is form
         for (let i=0; i < elts.length; i++) {
             if (!elts[i].hasAttribute('LSCookie')) continue;
@@ -463,6 +472,21 @@ class Application {
                 this.constructor.addEventListener_(elt, 'keydown', '_keyOnMenuInput');
             }
         }
+        */
+
+        let collection = document.querySelectorAll('[LSCookie]');
+        for (let i=0; i<collection.length; i++) {
+            let elt = collection[i];
+            if (elt.tagName != 'INPUT') continue;
+
+            let attr = elt.getAttribute('LSCookie');
+            let value = this._getLSCookie(attr);
+            if (value == null) value = '';
+            elt.value = value;
+            this.constructor.addEventListener_(elt, 'change',  '_slotLSCookieChanged');
+            this.constructor.addEventListener_(elt, 'keydown', '_keyOnMenuInput');
+        }
+
     }
 
 
@@ -516,8 +540,13 @@ class Application {
 
         let xhttp = new XMLHttpRequest();
         xhttp.open("POST", "", true);
+        xhttp._timeStart =  Date.now();
+
+            xhttp.upload.onprogress = function(ev) {  
+                let timeStamp =  Date.now() - xhttp._timeStart;  
+            }
             xhttp.ontimeout = function (ev) {
-                let err = 'Application::post_cmd_request error timeout cmd '+cmd;
+                let err = 'Application::post_cmd_request error timeout ('+ev.target.timeout+' ms) cmd='+cmd;
                 app.log (err);       
                 console.log("timeout timeStamp="+ev.timeStamp);
                 if (ontimeout !== null) 
@@ -556,15 +585,21 @@ class Application {
 
     }
 
-    post_cmd( submit_cmd, ...args ) {
+    post_cmd_timeout( submit_cmd, timeout, ...args ) {
         
         let json = new Promise((resolve, reject) => {  
             app.post_cmd_request( submit_cmd, args, this.session_hash,
                 (json) => {    resolve(json);      },       // resolve fct
                 (err)  => {    reject(err);        },       // timeout fct
-                1000  );  // timeout = 1sec
+                timeout  );  // timeout = 1sec
         });
         return json;
+
+    }
+
+    post_cmd( submit_cmd, ...args ) {
+        
+        return this.post_cmd_timeout( submit_cmd, 1000, ...args );
 
     }
 

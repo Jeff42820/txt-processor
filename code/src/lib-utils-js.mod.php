@@ -574,12 +574,14 @@ function removeNoBreakSpaces(s) {
 
 
 function array_splice ( arr, array_of_indexes, subarr=undefined ) {
+
     if (array_of_indexes.length == 0) return;
-    array_of_indexes.sort();
-    for (let i=array_of_indexes.length-1; i>=0; i--) {
-        let index = array_of_indexes[i];
-        if (subarr !== undefined) subarr.push( arr[index] );
-        arr.splice(index, 1);
+    let f = new Int32Array(array_of_indexes);   // By default, the sort method sorts elements alphabetically.
+                                                // we use Int32Array to resolve that problem
+    f.sort();
+    for (let i=f.length-1; i>=0; i--) {
+        if (subarr !== undefined) subarr.push( arr[f[i]] );
+        arr.splice(f[i], 1);
     }
 }
 
