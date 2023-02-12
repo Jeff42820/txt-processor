@@ -30,6 +30,7 @@ $CR="<br>\n";
 include './src/utils.php';                      // lib_php some php utilities
 include './src/cmodules.php';                   // lib_php class CModules
 include './src/cmainphp.php';                   // lib_php class CMainPhp (base for CPrjMain)
+include './src/cdbasepdo.php';                  // lib_php class CDbase : access to MariaDb  via PDO
 
 // == 2 lib modules ==
 include './src/lib-utils-js.mod.php';           // lib_js some js  utilities
@@ -43,8 +44,9 @@ include './src/div-containers.mod.php';         // division module for some cont
 include './src/div-contextmenu.mod.php';        // division module for context menus
 include './src/div-dropfile.mod.php';           // division module for a div to drag-drop files
 include './src/div-icons-1.mod.php';            // division module : some embeded svg icons
-// include './src/div-toolbar.mod.php';             //
+// include './src/div-toolbar.mod.php';         //
 include './src/div-accounting.mod.php';         // comptabilité
+include './src/div-accounting2.mod.php';        // comptabilité beta test
 include './src/div-tooltips.mod.php';           // tooltips
 
 // == 4 project modules ==
@@ -151,6 +153,7 @@ button[type="button"].program_edit {
     padding:  0.5em;
     border-radius: 1em;
     border: 0;
+    cursor: pointer;
 }
 
 button[type="button"].program_edit  i{
@@ -252,12 +255,13 @@ class ApplicationTest extends Application {
         const sec =  Math.floor(Date.now() / 1000.0);
         let icon = (sec % 2) == 0;
 
-        let lastuser  = app._getLSCookie('LSC_username');
-        let watermark = app._getLSCookie('LSC_watermark');
-        let wm_time   = app._getLSCookie('LSC_wm_time'); 
+        let li = WgtLogin.getLastuser();
+        if (!li.lastuser || li.lastuser=='') {
+            return;     // not logged ? no tic process
+        }
 
-        let json =  await this.post_cmd( 'post_tic', { user:lastuser, 
-                    watermark:watermark, wm_time:wm_time } );
+        let json =  await this.post_cmd( 'post_tic', { user: li.lastuser, 
+                    watermark: li.watermark, wm_time: li.wm_time } );
 
         if (!json) {
             app.log( 'ApplicationTest::timer post_tic returns null json' );
@@ -297,9 +301,13 @@ class ApplicationTest extends Application {
 
     // ========= onload ===========
     // ============================
-    async onload_after_modules() {    // window.onload = async function() 
+    async onload_after_modules() {
 
         super.onload_after_modules();
+
+        let li = WgtLogin.getLastuser();
+        this.slot_event_login( null, null, { user:li.lastuser, check:true }  );
+
         this.elt_file_src  = document.getElementById("id_file_src");
         this.elt_cmdlst_textarea = document.getElementById("id_cmdlst_textarea");
         this.elt_prog_list = document.getElementById('id_prog_list'); 
@@ -309,7 +317,6 @@ class ApplicationTest extends Application {
         this.elt_file_src.ondrop =       DmcDropfile._this.ev_dropfile;
         this.elt_file_src.ondragover =   DmcDropfile._this.ev_dragover; 
         this.elt_file_src.ondragleave =  DmcDropfile._this.ev_dragleave;        
-
 
 
         // this.set_p_value( 'id_js_symbols', escapeHtml('Symbols=')+this.symbols()+"<br>\\n" );
@@ -634,7 +641,7 @@ Voici la liste des champs reconnus :
         this.hideMenu(event);
         this.undo.push( this.elt_file_src.value );
         let row = this._getLSCookie('addRowAtTop');
-        this.elt_file_src.value = this.pcmd_addRowAtTop( this.elt_file_src.value, colNum );
+        this.elt_file_src.value = this.pcmd_addRowAtTop( this.elt_file_src.value, row );
         // this.add_cmd_to_prog('addRowAtTop', row); 
     }
 
@@ -817,9 +824,9 @@ Voici la liste des champs reconnus :
 
     etatParametrableFilter(method) {  // evtsig_etatparametrable
 
-        let acc = new DmcAccounting();
+        let acc = new DmcAccountingFilter();
         let dbEntries = acc.loadEntries( this.elt_file_src.value );
-        let inner = acc.etatParametrableFilter(dbEntries, method );
+        let inner = acc.etatParametrableFilter( dbEntries, method );
         let elt_file_dest = document.getElementById("id_file_dest"); 
         let tbody = elt_file_dest.getElementsByTagName('tbody')[0]; 
         tbody.innerHTML = inner;
@@ -1163,7 +1170,8 @@ Voici la liste des champs reconnus :
             case 'Banque postale':  
                 method =    "changeColumnTabToSemicolon()\\n"+
                             "removeRowIfNoDate(1)\\n"+
-                            "changeColumnsOrder('1;2;if+3;if-3')\\n";
+                            "changeColumnsOrder('1;2;3')\\n";
+                            // "changeColumnsOrder('1;2;if+3;if-3')\\n";
                 break;
         }
 
@@ -1512,8 +1520,9 @@ SOFTWARE.</pre>
 
     async evtsig_prepare_download() {
         this.hideMenu(event);
-        let json =  await this.post_cmd( 'post_prepare_download', this.elt_file_src.value );
+        let json =  await this.post_cmd_timeout( 'post_prepare_download', 60*1000, this.elt_file_src.value );
         if (json.msg != "") app.popup ( 'msg = \\n' + json.msg + '\\n' + '' );
+        else app.log('post_prepare_download duration='+json._duration+' ms');
     }
 
     // ================ end of cmds ===============
@@ -1723,40 +1732,40 @@ $html_menu = <<<EOLONGTEXT
         </li></ul>
 
 
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_changeCRinQuotes" style="cursor:pointer;"
-                statusmsg="inside &quot;strings&quot; change char (LF) (\\n) (0x0a) to something else">change in quotes '\\n' to :</label></td>
-                <td><input type="text" LSCookie="CRinQuotesChar" style="width:2em;" /></td></tr>
-        </table></form>
+        <div class="line">
+            <label signal="click››evtsig_changeCRinQuotes" style="cursor:pointer;"
+                statusmsg="inside &quot;strings&quot; change char (LF) (\\n) (0x0a) to something else">change in quotes '\\n' to :</label>
+            <input type="text" LSCookie="CRinQuotesChar" style="width:2em;" />
+        </div>
         <a signal="click››evtsig_changeDecimalSepFromPoint"
                 statusmsg="from 123.50 to 123,50 [.] =&gt; [,] (no change in quotes)">change decimal separator [.] =&gt; [,]</a>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_changeColumnsOrder" style="cursor:pointer;"
-                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7&gt;if|3=Some|+4  or  1;15&sol;(D )(.*)&sol;">change columns order</label></td>
-                <td><input type="text" LSCookie="columnsOrder" style="width:8em;" /></td></tr>
-        </table></form>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_reportCellIfNextIsEmpty" style="cursor:pointer;"
-                statusmsg="For column number : (columnNum)">report cell if next is empty</label></td>
-                <td><input type="text" LSCookie="reportCellIfNext" style="width:3em;" /></td></tr>
-        </table></form>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_removeRowIfNoDate" style="cursor:pointer;"
-                statusmsg="For column number : (columnNum)">remove line if not date in column </label></td>
-                <td><input type="text" LSCookie="removeRowIfNoDate" style="width:3em;" /></td></tr>
-        </table></form>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_addRowAtTop" style="cursor:pointer;"
-                statusmsg="Add a row (on top position)">add this at the top of the text </label></td>
-                <td><input type="text" LSCookie="addRowAtTop" style="width:8em;" /></td></tr>
-        </table></form>
+        <div class="line">
+            <label signal="click››evtsig_changeColumnsOrder" style="cursor:pointer;"
+                statusmsg="example of syntax :    1;2;if+3;if-3;4>5;7&gt;if|3=Some|+4  or  1;15&sol;(D )(.*)&sol;">change columns order</label>
+            <input type="text" LSCookie="columnsOrder" style="width:8em;" />
+        </div>
+        <div class="line">
+            <label signal="click››evtsig_reportCellIfNextIsEmpty" style="cursor:pointer;"
+                statusmsg="For column number : (columnNum)">report cell if next is empty</label>
+            <input type="text" LSCookie="reportCellIfNext" style="width:3em;" />
+        </div>
+        <div class="line">
+            <label signal="click››evtsig_removeRowIfNoDate" style="cursor:pointer;"
+                statusmsg="For column number : (columnNum)">remove line if not date in column </label>
+            <input type="text" LSCookie="removeRowIfNoDate" style="width:3em;" />
+        </div>
+        <div class="line">
+            <label signal="click››evtsig_addRowAtTop" style="cursor:pointer;"
+                statusmsg="Add a row (on top position)">add this at the top of the text </label>
+            <input type="text" LSCookie="addRowAtTop" style="width:8em;" />
+        </div>
 
         </div>
     </li>
 
 
 
-    <li id="id_mnu_tools"><a signal="click››evtsig_bnk_convert">Banques</a>
+    <li id="id_mnu_bnk"><a signal="click››evtsig_bnk_convert">Banques</a>
     </li>
 
 
@@ -1793,25 +1802,25 @@ $html_menu = <<<EOLONGTEXT
 
     <li id="id_mnu_calcs"><a  signal="click››evtsig_calcTable">Table</a>
         <div class="div_menu">
-        <a signal="click››evtsig_calcTable">Show table</a>
-        <a signal="click››evtsig_wgttable">Show table with search possibilities</a>
+            <a signal="click››evtsig_calcTable">Show table</a>
+            <a signal="click››evtsig_wgttable">Show table with search possibilities</a>
         </div>
     </li>
 
     <li id="id_mnu_calcs"><a>Compta</a>
         <div class="div_menu">
-        <a  signal="click››evtsig_grandJournal">Grand Journal</a>
-        <a  signal="click››evtsig_balance">Balance</a>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_journal" style="cursor:pointer;"
-                statusmsg="keywords : NumEcr, DatEcr, Journal, Compte, NumDoc, Libelle, Piece, Debit, Credit, Poste, DatSai">Journal : </label></td>
-                <td><input type="text" LSCookie="Journal" style="width:5em;" /></td></tr>
-        </table></form>
-        <form LSCookie="y"><table>
-            <tr><td><label signal="click››evtsig_compte" style="cursor:pointer;"
-                statusmsg="keywords : NumEcr, DatEcr, Journal, Compte, NumDoc, Libelle, Piece, Debit, Credit, Poste, DatSai">Compte : </label></td>
-                <td><input type="text" LSCookie="Compte" style="width:5em;" /></td></tr>
-        </table></form>
+            <a  signal="click››evtsig_grandJournal">Grand Journal</a>
+            <a  signal="click››evtsig_balance">Balance</a>
+            <div class="line">
+                <label signal="click››evtsig_journal" style="cursor:pointer;"
+                    statusmsg="keywords : NumEcr, DatEcr, Journal, Compte, NumDoc, Libelle, Piece, Debit, Credit, Poste, DatSai">Journal : </label>
+                <input type="text" LSCookie="Journal" style="width:5em;" />
+            </div>
+            <div class="line">
+                <label signal="click››evtsig_compte" style="cursor:pointer;"
+                    statusmsg="keywords : NumEcr, DatEcr, Journal, Compte, NumDoc, Libelle, Piece, Debit, Credit, Poste, DatSai">Compte : </label>
+                <input type="text" LSCookie="Compte" style="width:5em;" />
+            </div>
         </div>
     </li>
 
