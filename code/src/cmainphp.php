@@ -484,8 +484,8 @@ class CMainPhp {                    // base class for CPrjMain
         // $fields = $this->table->_getFields();    echo "fields = " .print_r( $fields, true )."\n";
         /*
         $rec=[];
-        $rec['email']  = 'jflemay@hotmail.com';
-        $rec['passwd'] = 'faat';
+        $rec['email']  = 'jflemay@email.com';
+        $rec['passwd'] = '****';
         if (!$this->table->appendRecord($rec)) { $s .= $this->table->last_exception; }
         */
         

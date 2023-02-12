@@ -90,7 +90,7 @@ function toObject($array) {
 class CDbase { 
     
     protected  string  $user        = 'txtproc';
-    protected  string  $passwd      = 'Pass-pass2000}';
+    protected  string  $passwd      = '************';
     protected  string  $dbname      = 'txtprocessor';
     protected  string  $dbase_host  = '[127.0.0.1]';        // '[::1]'
     protected  string  $dbase_port  = '3306';               
